@@ -1,0 +1,29 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+artifacts/
+[Dd]ebug/
+[Rr]elease/
+TestResults/
+
+## Rider / VS Code
+.idea/
+.vscode/
+
+## Env / secrets
+.env
+*.env.local
+secrets/
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Docker volumes (yerel)
+.data/
+
+## Claude Code (makineye özel)
+.claude/settings.local.json

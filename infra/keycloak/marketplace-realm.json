@@ -1,0 +1,62 @@
+{
+  "realm": "marketplace",
+  "enabled": true,
+  "sslRequired": "none",
+  "roles": {
+    "realm": [
+      { "name": "owner", "description": "Pazaryeri sahibi / platform yöneticisi" },
+      { "name": "platform-admin", "description": "Platform yöneticisi" },
+      { "name": "merchant", "description": "Merchant kullanıcısı" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "marketplace-mobile",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["*"],
+      "webOrigins": ["*"],
+      "protocolMappers": [
+        {
+          "name": "tenant_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "tenant_id",
+            "claim.name": "tenant_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "demo-merchant",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "merchant@demo.local",
+      "firstName": "Demo",
+      "lastName": "Merchant",
+      "requiredActions": [],
+      "credentials": [{ "type": "password", "value": "demo123", "temporary": false }],
+      "realmRoles": ["merchant"],
+      "attributes": { "tenant_id": ["11111111-1111-1111-1111-111111111111"] }
+    },
+    {
+      "username": "demo-owner",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "owner@demo.local",
+      "firstName": "Demo",
+      "lastName": "Owner",
+      "requiredActions": [],
+      "credentials": [{ "type": "password", "value": "demo123", "temporary": false }],
+      "realmRoles": ["owner", "platform-admin"]
+    }
+  ]
+}

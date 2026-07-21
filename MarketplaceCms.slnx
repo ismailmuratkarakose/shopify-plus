@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/Marketplace.BuildingBlocks/Marketplace.BuildingBlocks.csproj" />
+  </Folder>
+  <Folder Name="/src/Contracts/">
+    <Project Path="src/Contracts/Marketplace.Contracts/Marketplace.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/src/Gateway/">
+    <Project Path="src/Gateway/Marketplace.Gateway/Marketplace.Gateway.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/Catalog/">
+    <Project Path="src/Services/Catalog/Marketplace.Catalog.Api/Marketplace.Catalog.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Inventory/">
+    <Project Path="src/Services/Inventory/Marketplace.Inventory.Api/Marketplace.Inventory.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Merchant/">
+    <Project Path="src/Services/Merchant/Marketplace.Merchant.Api/Marketplace.Merchant.Api.csproj" />
+  </Folder>
+</Solution>
