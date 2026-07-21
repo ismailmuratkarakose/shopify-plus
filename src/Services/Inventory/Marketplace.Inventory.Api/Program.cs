@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenApi();
+builder.Services.AddMarketplaceOpenApi();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantContext, TenantContext>();
@@ -48,7 +48,7 @@ if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     scope.ServiceProvider.GetRequiredService<InventoryDbContext>().Database.Migrate();
-    app.MapOpenApi();
+    app.UseMarketplaceSwaggerUi("Inventory API");
 }
 
 app.UseAuthentication();

@@ -78,6 +78,17 @@ Servisler:
 | RabbitMQ yönetim | http://localhost:15672 (guest/guest) |
 | PostgreSQL | localhost:5432 |
 
+### Swagger / API arayüzleri (dev)
+
+Her API servisi kendi portunda interaktif Swagger UI sunar. **Authorize** düğmesine Keycloak JWT'sini yapıştırıp korumalı endpoint'leri deneyebilirsin (token için aşağıdaki `curl` bloğuna bak).
+
+| Servis | Swagger UI | OpenAPI JSON |
+|---|---|---|
+| Catalog | http://localhost:8082/swagger | http://localhost:8082/openapi/v1.json |
+| Merchant | http://localhost:8083/swagger | http://localhost:8083/openapi/v1.json |
+| Inventory | http://localhost:8084/swagger | http://localhost:8084/openapi/v1.json |
+| Order | http://localhost:8085/swagger | http://localhost:8085/openapi/v1.json |
+
 Sağlık kontrolü:
 ```bash
 curl http://localhost:8081/health        # gateway

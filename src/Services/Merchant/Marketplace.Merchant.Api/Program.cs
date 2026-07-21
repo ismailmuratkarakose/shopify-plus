@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenApi();
+builder.Services.AddMarketplaceOpenApi();
 
 // --- Multi-tenancy ---
 builder.Services.AddHttpContextAccessor();
@@ -61,7 +61,7 @@ if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     scope.ServiceProvider.GetRequiredService<MerchantDbContext>().Database.Migrate();
-    app.MapOpenApi();
+    app.UseMarketplaceSwaggerUi("Merchant API");
 }
 
 app.UseAuthentication();

@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 // --- OpenAPI ---
-builder.Services.AddOpenApi();
+builder.Services.AddMarketplaceOpenApi();
 
 // --- Multi-tenancy (istek başına) ---
 builder.Services.AddHttpContextAccessor();
@@ -62,7 +62,7 @@ if (app.Environment.IsDevelopment())
 }
 
 if (app.Environment.IsDevelopment())
-    app.MapOpenApi();
+    app.UseMarketplaceSwaggerUi("Catalog API");
 
 app.UseAuthentication();
 app.UseTenantResolution();   // tenant claim'i AuthN'den sonra çözülür
