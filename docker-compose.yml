@@ -88,6 +88,44 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  inventory:
+    build:
+      context: .
+      dockerfile: src/Services/Inventory/Marketplace.Inventory.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__InventoryDb: "Host=postgres;Port=5432;Database=inventory;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Username: ${RABBITMQ_USER:-guest}
+      RabbitMq__Password: ${RABBITMQ_PASS:-guest}
+      Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
+    ports:
+      - "8084:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  order:
+    build:
+      context: .
+      dockerfile: src/Services/Order/Marketplace.Order.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__OrderDb: "Host=postgres;Port=5432;Database=ordering;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Username: ${RABBITMQ_USER:-guest}
+      RabbitMq__Password: ${RABBITMQ_PASS:-guest}
+      Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
+    ports:
+      - "8085:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
   gateway:
     build:
       context: .
@@ -97,8 +135,12 @@ services:
       Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
       ReverseProxy__Clusters__catalog-cluster__Destinations__catalog__Address: "http://catalog:8080/"
       ReverseProxy__Clusters__merchant-cluster__Destinations__merchant__Address: "http://merchant:8080/"
+      ReverseProxy__Clusters__inventory-cluster__Destinations__inventory__Address: "http://inventory:8080/"
+      ReverseProxy__Clusters__order-cluster__Destinations__order__Address: "http://order:8080/"
     ports:
       - "8081:8080"
     depends_on:
       - catalog
       - merchant
+      - inventory
+      - order

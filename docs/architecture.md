@@ -67,7 +67,7 @@
 | Faz | Kapsam | Çıktı |
 |---|---|---|
 | **0** ✅ | İskele | Monorepo, BuildingBlocks, Gateway, Catalog dikey kesiti, docker-compose, Keycloak realm |
-| **1** 🟡 | Çekirdek domain | ✅ Merchant onboarding + şifreli entegrasyon config, ✅ Outbox, ✅ ortak Web yapı taşları · ⏳ Inventory, Order temeli |
+| **1** ✅ | Çekirdek domain | Merchant onboarding + şifreli entegrasyon config, Outbox, ortak Web yapı taşları, `Marketplace.Contracts`, Inventory + Order + event-driven koreografi (sipariş↔stok rezervasyonu) |
 | **2** | Shopify | Çift yönlü senkron, webhook, çakışma çözümü |
 | **3** | Ödeme | iyzico + PayPal, saga, merchant config |
 | **4** | Mobil BFF | Katalog listeleme, sepet, checkout, sipariş takibi |
@@ -79,6 +79,7 @@
 - **Transactional Outbox (özel):** `BuildingBlocks/Outbox` — `OutboxMessage` + `OutboxDispatcher<TContext>`. Event, iş verisiyle aynı `SaveChanges`'te yazılır; arka plan dispatcher RabbitMQ'ya güvenilir teslim eder (en-az-bir-kez). Catalog ve Merchant kullanıyor.
 - **Ortak Web yapı taşları:** `BuildingBlocks/Web` — `AddKeycloakJwtAuth`, `UseTenantResolution`, `ResultHttpExtensions`. Tüm servislerde tek kaynaktan.
 - **Secret şifreleme:** `AesGcmSecretProtector` (AES-256-GCM). Merchant ödeme/Shopify anahtarları at-rest şifreli. Anahtar K8s secret'tan (`Secrets__EncryptionKey`).
+- **Servisler arası koreografi (Order↔Inventory):** `Marketplace.Contracts` paylaşılan event tipleri (MassTransit MessageUrn eşleşmesi). Akış: Catalog `ProductCreated` → Inventory stok kaydı açar; Order `OrderPlaced` → Inventory stok rezerve eder → `StockReserved`/`StockReservationFailed` → Order siparişi `Confirmed`/`Rejected` yapar. Consumer'lar HTTP dışında çalıştığından tenant'ı event'in `TenantId`'sinden kurar (`ITenantContext.SetTenant`). Tüm yayınlar outbox üzerinden (en-az-bir-kez; consumer'lar idempotent).
 
 ## 10. Açık teknik notlar / kararlar
 

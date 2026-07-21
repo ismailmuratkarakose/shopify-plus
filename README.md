@@ -42,9 +42,12 @@ Mobil / Merchant Paneli / Owner Paneli
 ```
 src/
   BuildingBlocks/Marketplace.BuildingBlocks   # Result, ITenantContext, Outbox, Secret şifreleme, ortak Web (auth/tenant)
+  Contracts/Marketplace.Contracts             # Servisler arası paylaşılan integration event tipleri
   Gateway/Marketplace.Gateway                 # YARP reverse proxy + auth + rate limit
   Services/Catalog/Marketplace.Catalog.Api    # Ürün/kategori (outbox'lu)
   Services/Merchant/Marketplace.Merchant.Api  # Merchant onboarding + şifreli Shopify/ödeme config (outbox'lu)
+  Services/Inventory/Marketplace.Inventory.Api # Stok + event consumer'ları (ProductCreated/OrderPlaced)
+  Services/Order/Marketplace.Order.Api        # Sipariş + stok rezervasyon koreografisi
 infra/keycloak/marketplace-realm.json         # Keycloak realm import
 infra/postgres/init/                          # db-per-service oluşturma scriptleri
 docs/architecture.md                          # Detaylı mimari + yol haritası
@@ -69,6 +72,8 @@ Servisler:
 | Gateway | http://localhost:8081 |
 | Catalog (doğrudan) | http://localhost:8082 |
 | Merchant (doğrudan) | http://localhost:8083 |
+| Inventory (doğrudan) | http://localhost:8084 |
+| Order (doğrudan) | http://localhost:8085 |
 | Keycloak | http://localhost:8080 (admin/admin) |
 | RabbitMQ yönetim | http://localhost:15672 (guest/guest) |
 | PostgreSQL | localhost:5432 |

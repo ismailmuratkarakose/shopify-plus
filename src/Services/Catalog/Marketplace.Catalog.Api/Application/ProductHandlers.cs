@@ -56,9 +56,10 @@ public sealed class CreateProductHandler : IRequestHandler<CreateProductCommand,
         _db.Products.Add(product);
 
         // Event, iş verisiyle aynı transaction'da outbox'a yazılır (atomik). Dispatcher sonradan yayınlar.
+        // NOT: product.TenantId bu noktada henüz Guid.Empty (SaveChanges'te atanır); gerçek tenant _tenant'tan alınır.
         _db.EnqueueIntegrationEvent(new ProductCreatedIntegrationEvent
         {
-            TenantId = product.TenantId,
+            TenantId = _tenant.TenantId,
             ProductId = product.Id,
             Sku = product.Sku,
             Title = product.Title,

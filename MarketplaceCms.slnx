@@ -19,4 +19,7 @@
   <Folder Name="/src/Services/Merchant/">
     <Project Path="src/Services/Merchant/Marketplace.Merchant.Api/Marketplace.Merchant.Api.csproj" />
   </Folder>
+  <Folder Name="/src/Services/Order/">
+    <Project Path="src/Services/Order/Marketplace.Order.Api/Marketplace.Order.Api.csproj" />
+  </Folder>
 </Solution>
