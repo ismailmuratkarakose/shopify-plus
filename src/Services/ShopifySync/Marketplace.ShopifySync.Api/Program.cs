@@ -6,6 +6,7 @@ using Marketplace.ShopifySync.Api.Api;
 using Marketplace.ShopifySync.Api.Consumers;
 using Marketplace.ShopifySync.Api.Infrastructure;
 using Marketplace.ShopifySync.Api.Shopify;
+using Marketplace.ShopifySync.Api.Webhooks;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,6 +30,8 @@ builder.Services.AddHttpClient<IMerchantCredentialClient, MerchantCredentialClie
     c.BaseAddress = new Uri(builder.Configuration["Merchant:InternalBaseUrl"]!);
     c.DefaultRequestHeaders.Add("X-Internal-Api-Key", builder.Configuration["Internal:ApiKey"]!);
 });
+
+builder.Services.AddScoped<ShopifyWebhookProcessor>();
 
 // Shopify client: config ile simulator / graphql seçilir.
 var clientMode = builder.Configuration["Shopify:ClientMode"] ?? "simulator";
@@ -75,6 +78,7 @@ app.UseAuthorization();
 
 app.MapHealthChecks("/health");
 app.MapShopifyEndpoints();
+app.MapShopifyWebhookEndpoints();
 
 app.Run();
 

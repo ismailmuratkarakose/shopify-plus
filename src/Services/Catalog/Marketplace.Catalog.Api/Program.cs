@@ -28,7 +28,9 @@ builder.Services.AddValidatorsFromAssemblyContaining<CreateProductValidator>();
 // --- MassTransit / RabbitMQ (event bus) ---
 builder.Services.AddMassTransit(x =>
 {
-    x.SetKebabCaseEndpointNameFormatter();
+    // Servise özel kuyruk öneki (çakışma önleme; bkz docs/architecture.md).
+    x.SetEndpointNameFormatter(new KebabCaseEndpointNameFormatter("catalog", includeNamespace: false));
+    x.AddConsumer<Marketplace.Catalog.Api.Consumers.ProductUpsertedFromShopifyConsumer>();
     x.UsingRabbitMq((context, cfg) =>
     {
         var rmq = builder.Configuration.GetSection("RabbitMq");

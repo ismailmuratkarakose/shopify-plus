@@ -16,6 +16,7 @@ public class ShopifySyncDbContext : DbContext
 
     public DbSet<ShopifyIntegration> Integrations => Set<ShopifyIntegration>();
     public DbSet<ProductMapping> ProductMappings => Set<ProductMapping>();
+    public DbSet<WebhookInbox> WebhookInbox => Set<WebhookInbox>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -33,8 +34,15 @@ public class ShopifySyncDbContext : DbContext
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.Sku).HasMaxLength(100).IsRequired();
-            e.HasIndex(x => new { x.TenantId, x.MarketplaceProductId }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.Sku }).IsUnique();
             e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+        });
+
+        modelBuilder.Entity<WebhookInbox>(e =>
+        {
+            e.HasKey(x => x.WebhookId);
+            e.Property(x => x.WebhookId).HasMaxLength(200);
+            e.Property(x => x.Topic).HasMaxLength(100);
         });
 
         modelBuilder.AddOutboxMessage("shopify");

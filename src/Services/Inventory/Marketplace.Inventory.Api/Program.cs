@@ -26,6 +26,7 @@ builder.Services.AddMassTransit(x =>
     x.SetEndpointNameFormatter(new KebabCaseEndpointNameFormatter("inventory", includeNamespace: false));
     x.AddConsumer<ProductCreatedConsumer>();
     x.AddConsumer<OrderPlacedConsumer>();
+    x.AddConsumer<StockChangedFromShopifyConsumer>();
     x.UsingRabbitMq((context, cfg) =>
     {
         var rmq = builder.Configuration.GetSection("RabbitMq");
@@ -34,6 +35,9 @@ builder.Services.AddMassTransit(x =>
             h.Username(rmq["Username"] ?? "guest");
             h.Password(rmq["Password"] ?? "guest");
         });
+        // Webhook sırası garanti değil: stok, ilgili ürün/envanter kaydı henüz yoksa
+        // consumer exception atar; kademeli retry ile kayıt oluştuktan sonra uygulanır.
+        cfg.UseMessageRetry(r => r.Intervals(2000, 4000, 8000, 15000));
         cfg.ConfigureEndpoints(context);
     });
 });

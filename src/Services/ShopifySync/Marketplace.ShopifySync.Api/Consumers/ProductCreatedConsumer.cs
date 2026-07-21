@@ -58,7 +58,7 @@ public sealed class ProductCreatedConsumer : IConsumer<ProductCreatedIntegration
             _protector.Unprotect(integration.EncryptedAccessToken));
 
         var mapping = await _db.ProductMappings
-            .FirstOrDefaultAsync(m => m.MarketplaceProductId == e.ProductId, context.CancellationToken);
+            .FirstOrDefaultAsync(m => m.Sku == e.Sku, context.CancellationToken);
 
         var pushed = await _shopify.UpsertProductAsync(
             store,

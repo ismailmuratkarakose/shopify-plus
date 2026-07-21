@@ -142,6 +142,7 @@ services:
       Internal__ApiKey: ${INTERNAL_API_KEY:-dev-internal-key-change-me}
       Secrets__EncryptionKey: ${MERCHANT_ENCRYPTION_KEY:-MDEyMzQ1Njc4OUFCQ0RFRjAxMjM0NTY3ODlBQkNERUY=}
       Shopify__ClientMode: ${SHOPIFY_CLIENT_MODE:-simulator}
+      Shopify__WebhookSecret: ${SHOPIFY_WEBHOOK_SECRET:-dev-shopify-webhook-secret}
     ports:
       - "8086:8080"
     depends_on:

@@ -49,6 +49,27 @@ public record StockReservationFailedIntegrationEvent : IntegrationEvent
     public string Reason { get; init; } = default!;
 }
 
+// --- Shopify inbound (Shopify → Pazaryeri) ---
+
+/// <summary>Shopify'dan ürün oluştu/güncellendi webhook'u. Catalog upsert eder (Source=shopify).</summary>
+public record ProductUpsertedFromShopifyIntegrationEvent : IntegrationEvent
+{
+    public long ShopifyProductId { get; init; }
+    public string Sku { get; init; } = default!;
+    public string Title { get; init; } = default!;
+    public string? Description { get; init; }
+    public decimal Price { get; init; }
+    public string Currency { get; init; } = default!;
+    public DateTimeOffset ShopifyUpdatedAt { get; init; }
+}
+
+/// <summary>Shopify'dan stok değişti webhook'u. Inventory ilgili SKU'nun stoğunu günceller.</summary>
+public record StockChangedFromShopifyIntegrationEvent : IntegrationEvent
+{
+    public string Sku { get; init; } = default!;
+    public int QuantityOnHand { get; init; }
+}
+
 // --- Merchant ---
 
 public record MerchantRegisteredIntegrationEvent : IntegrationEvent
