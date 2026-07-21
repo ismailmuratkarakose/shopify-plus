@@ -48,6 +48,7 @@ src/
   Services/Merchant/Marketplace.Merchant.Api  # Merchant onboarding + şifreli Shopify/ödeme config (outbox'lu)
   Services/Inventory/Marketplace.Inventory.Api # Stok + event consumer'ları (ProductCreated/OrderPlaced)
   Services/Order/Marketplace.Order.Api        # Sipariş + stok rezervasyon koreografisi
+  Services/ShopifySync/Marketplace.ShopifySync.Api # Shopify çift yönlü senkron (IShopifyClient: simulator/graphql)
 infra/keycloak/marketplace-realm.json         # Keycloak realm import
 infra/postgres/init/                          # db-per-service oluşturma scriptleri
 docs/architecture.md                          # Detaylı mimari + yol haritası
@@ -74,6 +75,7 @@ Servisler:
 | Merchant (doğrudan) | http://localhost:8083 |
 | Inventory (doğrudan) | http://localhost:8084 |
 | Order (doğrudan) | http://localhost:8085 |
+| ShopifySync (doğrudan) | http://localhost:8086 |
 | Keycloak | http://localhost:8080 (admin/admin) |
 | RabbitMQ yönetim | http://localhost:15672 (guest/guest) |
 | PostgreSQL | localhost:5432 |
@@ -88,6 +90,7 @@ Her API servisi kendi portunda interaktif Swagger UI sunar. **Authorize** düğm
 | Merchant | http://localhost:8083/swagger | http://localhost:8083/openapi/v1.json |
 | Inventory | http://localhost:8084/swagger | http://localhost:8084/openapi/v1.json |
 | Order | http://localhost:8085/swagger | http://localhost:8085/openapi/v1.json |
+| ShopifySync | http://localhost:8086/swagger | http://localhost:8086/openapi/v1.json |
 
 Sağlık kontrolü:
 ```bash

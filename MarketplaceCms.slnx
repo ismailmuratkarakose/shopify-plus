@@ -22,4 +22,7 @@
   <Folder Name="/src/Services/Order/">
     <Project Path="src/Services/Order/Marketplace.Order.Api/Marketplace.Order.Api.csproj" />
   </Folder>
+  <Folder Name="/src/Services/ShopifySync/">
+    <Project Path="src/Services/ShopifySync/Marketplace.ShopifySync.Api/Marketplace.ShopifySync.Api.csproj" />
+  </Folder>
 </Solution>

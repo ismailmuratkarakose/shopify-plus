@@ -4,6 +4,7 @@ using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.BuildingBlocks.Outbox;
 using Marketplace.BuildingBlocks.Results;
 using Marketplace.BuildingBlocks.Security;
+using Marketplace.Contracts;
 using Marketplace.Merchant.Api.Domain;
 using Marketplace.Merchant.Api.Infrastructure;
 using MediatR;

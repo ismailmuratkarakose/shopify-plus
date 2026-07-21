@@ -63,8 +63,10 @@ public sealed class CreateProductHandler : IRequestHandler<CreateProductCommand,
             ProductId = product.Id,
             Sku = product.Sku,
             Title = product.Title,
+            Description = product.Description,
             Price = product.Price,
-            Currency = product.Currency
+            Currency = product.Currency,
+            Source = product.Source
         });
 
         await _db.SaveChangesAsync(ct);

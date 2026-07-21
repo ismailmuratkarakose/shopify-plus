@@ -70,6 +70,7 @@ app.UseAuthorization();
 
 app.MapHealthChecks("/health");
 app.MapMerchantEndpoints();
+app.MapMerchantInternalEndpoints();
 
 app.Run();
 

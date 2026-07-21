@@ -22,7 +22,8 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Progr
 // --- MassTransit: consumer'lar + RabbitMQ ---
 builder.Services.AddMassTransit(x =>
 {
-    x.SetKebabCaseEndpointNameFormatter();
+    // Servise özel kuyruk öneki: farklı servisler aynı consumer adını kullansa bile kuyruklar çakışmaz (fan-out korunur).
+    x.SetEndpointNameFormatter(new KebabCaseEndpointNameFormatter("inventory", includeNamespace: false));
     x.AddConsumer<ProductCreatedConsumer>();
     x.AddConsumer<OrderPlacedConsumer>();
     x.UsingRabbitMq((context, cfg) =>

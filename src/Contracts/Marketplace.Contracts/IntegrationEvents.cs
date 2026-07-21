@@ -5,14 +5,18 @@ namespace Marketplace.Contracts;
 // Servisler arası TÜKETİLEN event'ler burada tek CLR tipinden tanımlanır.
 // Yayınlayan ve tüketen aynı tipi kullanır → MassTransit MessageUrn eşleşmesi garanti.
 
-/// <summary>Catalog bir ürün oluşturduğunda. Inventory bunu tüketip stok kaydı açar.</summary>
+/// <summary>Catalog bir ürün oluşturduğunda. Inventory stok kaydı açar, ShopifySync outbound push eder.</summary>
 public record ProductCreatedIntegrationEvent : IntegrationEvent
 {
     public Guid ProductId { get; init; }
     public string Sku { get; init; } = default!;
     public string Title { get; init; } = default!;
+    public string? Description { get; init; }
     public decimal Price { get; init; }
     public string Currency { get; init; } = default!;
+
+    /// <summary>Ürünün kaynağı ("marketplace" / "shopify"). Döngü önleme: shopify kaynaklı ürün tekrar push edilmez.</summary>
+    public string Source { get; init; } = "marketplace";
 }
 
 public record OrderLine
@@ -43,4 +47,24 @@ public record StockReservationFailedIntegrationEvent : IntegrationEvent
 {
     public Guid OrderId { get; init; }
     public string Reason { get; init; } = default!;
+}
+
+// --- Merchant ---
+
+public record MerchantRegisteredIntegrationEvent : IntegrationEvent
+{
+    public Guid MerchantId { get; init; }
+    public string Name { get; init; } = default!;
+    public string Slug { get; init; } = default!;
+}
+
+/// <summary>
+/// Bir merchant Shopify/ödeme sağlayıcı bağladığında yayınlanır. Secret İÇERMEZ.
+/// Tüketiciler (ör. ShopifySync) credential'ı Merchant internal endpoint'inden çeker.
+/// </summary>
+public record MerchantIntegrationConfiguredIntegrationEvent : IntegrationEvent
+{
+    public Guid MerchantId { get; init; }
+    public string Provider { get; init; } = default!;
+    public bool IsActive { get; init; }
 }

@@ -68,7 +68,7 @@
 |---|---|---|
 | **0** ✅ | İskele | Monorepo, BuildingBlocks, Gateway, Catalog dikey kesiti, docker-compose, Keycloak realm |
 | **1** ✅ | Çekirdek domain | Merchant onboarding + şifreli entegrasyon config, Outbox, ortak Web yapı taşları, `Marketplace.Contracts`, Inventory + Order + event-driven koreografi (sipariş↔stok rezervasyonu) |
-| **2** | Shopify | Çift yönlü senkron, webhook, çakışma çözümü |
+| **2** 🟡 | Shopify | ✅ ShopifySync servisi, IShopifyClient (simulator/GraphQL), entegrasyon read-model (Merchant internal API'den credential), ✅ outbound ürün senkronu (ProductCreated→Shopify) + eşleme + döngü önleme · ⏳ inbound webhook (HMAC+idempotency), stok iki yön, çakışma çözümü |
 | **3** | Ödeme | iyzico + PayPal, saga, merchant config |
 | **4** | Mobil BFF | Katalog listeleme, sepet, checkout, sipariş takibi |
 | **5** | Raporlama + owner | Komisyon, ciro, dashboard API'leri |
@@ -80,6 +80,8 @@
 - **Ortak Web yapı taşları:** `BuildingBlocks/Web` — `AddKeycloakJwtAuth`, `UseTenantResolution`, `ResultHttpExtensions`. Tüm servislerde tek kaynaktan.
 - **Secret şifreleme:** `AesGcmSecretProtector` (AES-256-GCM). Merchant ödeme/Shopify anahtarları at-rest şifreli. Anahtar K8s secret'tan (`Secrets__EncryptionKey`).
 - **Servisler arası koreografi (Order↔Inventory):** `Marketplace.Contracts` paylaşılan event tipleri (MassTransit MessageUrn eşleşmesi). Akış: Catalog `ProductCreated` → Inventory stok kaydı açar; Order `OrderPlaced` → Inventory stok rezerve eder → `StockReserved`/`StockReservationFailed` → Order siparişi `Confirmed`/`Rejected` yapar. Consumer'lar HTTP dışında çalıştığından tenant'ı event'in `TenantId`'sinden kurar (`ITenantContext.SetTenant`). Tüm yayınlar outbox üzerinden (en-az-bir-kez; consumer'lar idempotent).
+- **MassTransit kuyruk adlandırma:** Birden fazla servis aynı consumer tip adını kullanırsa (ör. Inventory ve ShopifySync'te `ProductCreatedConsumer`), varsayılan formatter aynı kuyruk adını üretir → tek kuyrukta yarışırlar (fan-out bozulur). Çözüm: her serviste `SetEndpointNameFormatter(new KebabCaseEndpointNameFormatter("<servis>", false))` ile servise özel önek → ayrı kuyruklar, her ikisi de exchange'e bağlı.
+- **Shopify senkronu (ShopifySync):** Merchant `MerchantIntegrationConfigured` → ShopifySync credential'ı Merchant **internal endpoint**'inden (`X-Internal-Api-Key`, gateway'e route edilmez) çeker, token'ı shared key ile at-rest şifreli saklar. Outbound: `ProductCreated` → `IShopifyClient` (config `Shopify:ClientMode`: simulator/graphql) → push + `ProductMapping`. Döngü önleme: `Source=shopify` olan ürün tekrar push edilmez. Secret event bus'a hiç düşmez.
 
 ## 10. Açık teknik notlar / kararlar
 

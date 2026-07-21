@@ -42,18 +42,4 @@ public sealed class UpsertIntegrationValidator : AbstractValidator<UpsertIntegra
     }
 }
 
-// --- Integration Events (outbox üzerinden) ---
-public record MerchantRegisteredIntegrationEvent : IntegrationEvent
-{
-    public Guid MerchantId { get; init; }
-    public string Name { get; init; } = default!;
-    public string Slug { get; init; } = default!;
-}
-
-/// <summary>Bir merchant Shopify/ödeme sağlayıcı bağladığında yayınlanır. Secret İÇERMEZ.</summary>
-public record MerchantIntegrationConfiguredIntegrationEvent : IntegrationEvent
-{
-    public Guid MerchantId { get; init; }
-    public string Provider { get; init; } = default!;
-    public bool IsActive { get; init; }
-}
+// Integration event'leri Marketplace.Contracts'a taşındı (servisler arası paylaşım).

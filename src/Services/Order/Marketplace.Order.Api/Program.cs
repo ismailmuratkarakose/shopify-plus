@@ -24,7 +24,8 @@ builder.Services.AddValidatorsFromAssemblyContaining<CreateOrderValidator>();
 
 builder.Services.AddMassTransit(x =>
 {
-    x.SetKebabCaseEndpointNameFormatter();
+    // Servise özel kuyruk öneki: farklı servisler aynı consumer adını kullansa bile kuyruklar çakışmaz (fan-out korunur).
+    x.SetEndpointNameFormatter(new KebabCaseEndpointNameFormatter("order", includeNamespace: false));
     x.AddConsumer<StockReservedConsumer>();
     x.AddConsumer<StockReservationFailedConsumer>();
     x.UsingRabbitMq((context, cfg) =>
