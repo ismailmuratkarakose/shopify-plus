@@ -49,7 +49,8 @@ public sealed class CreateMerchantHandler : IRequestHandler<CreateMerchantComman
             TenantId = merchant.Id,
             MerchantId = merchant.Id,
             Name = merchant.Name,
-            Slug = merchant.Slug
+            Slug = merchant.Slug,
+            CommissionRate = merchant.CommissionRate
         });
         await _db.SaveChangesAsync(ct);
 

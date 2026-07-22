@@ -110,6 +110,9 @@ public record MerchantRegisteredIntegrationEvent : IntegrationEvent
     public Guid MerchantId { get; init; }
     public string Name { get; init; } = default!;
     public string Slug { get; init; } = default!;
+
+    /// <summary>Pazaryeri komisyon oranı (0-1). Reporting komisyon hesabı için tüketir.</summary>
+    public decimal CommissionRate { get; init; }
 }
 
 /// <summary>

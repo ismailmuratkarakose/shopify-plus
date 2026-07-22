@@ -173,6 +173,25 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  reporting:
+    build:
+      context: .
+      dockerfile: src/Services/Reporting/Marketplace.Reporting.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__ReportingDb: "Host=postgres;Port=5432;Database=reporting;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Username: ${RABBITMQ_USER:-guest}
+      RabbitMq__Password: ${RABBITMQ_PASS:-guest}
+      Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
+    ports:
+      - "8089:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
   bff:
     build:
       context: .
@@ -206,6 +225,7 @@ services:
       ReverseProxy__Clusters__shopify-cluster__Destinations__shopify__Address: "http://shopifysync:8080/"
       ReverseProxy__Clusters__payment-cluster__Destinations__payment__Address: "http://payment:8080/"
       ReverseProxy__Clusters__bff-cluster__Destinations__bff__Address: "http://bff:8080/"
+      ReverseProxy__Clusters__reporting-cluster__Destinations__reporting__Address: "http://reporting:8080/"
     ports:
       - "8081:8080"
     depends_on:
@@ -216,3 +236,4 @@ services:
       - shopifysync
       - payment
       - bff
+      - reporting

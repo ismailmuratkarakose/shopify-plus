@@ -50,6 +50,7 @@ src/
   Services/Order/Marketplace.Order.Api        # Sipariş + stok rezervasyon koreografisi
   Services/ShopifySync/Marketplace.ShopifySync.Api # Shopify çift yönlü senkron (IShopifyClient: simulator/graphql)
   Services/Payment/Marketplace.Payment.Api    # Ödeme saga (IPaymentProvider: simulator/iyzico/paypal)
+  Services/Reporting/Marketplace.Reporting.Api # Raporlama read-model (event-sourced): komisyon/ciro/owner dashboard
   Bff/Marketplace.Bff.Mobile.Api              # Mobil BFF: katalog+sepet(Redis)+checkout+sipariş takibi (JWT forwarding)
 infra/keycloak/marketplace-realm.json         # Keycloak realm import
 infra/postgres/init/                          # db-per-service oluşturma scriptleri
@@ -80,6 +81,7 @@ Servisler:
 | ShopifySync (doğrudan) | http://localhost:8086 |
 | Payment (doğrudan) | http://localhost:8087 |
 | Mobil BFF (doğrudan) | http://localhost:8088 |
+| Reporting (doğrudan) | http://localhost:8089 |
 | Keycloak | http://localhost:8080 (admin/admin) |
 | RabbitMQ yönetim | http://localhost:15672 (guest/guest) |
 | PostgreSQL | localhost:5432 |
@@ -97,6 +99,7 @@ Her API servisi kendi portunda interaktif Swagger UI sunar. **Authorize** düğm
 | ShopifySync | http://localhost:8086/swagger | http://localhost:8086/openapi/v1.json |
 | Payment | http://localhost:8087/swagger | http://localhost:8087/openapi/v1.json |
 | Mobil BFF | http://localhost:8088/swagger | http://localhost:8088/openapi/v1.json |
+| Reporting | http://localhost:8089/swagger | http://localhost:8089/openapi/v1.json |
 
 Sağlık kontrolü:
 ```bash
