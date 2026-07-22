@@ -2,6 +2,7 @@ using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.BuildingBlocks.Web;
 using Marketplace.Cms.Api.Api;
 using Marketplace.Cms.Api.Clients;
+using Marketplace.Cms.Api.Experience;
 using Marketplace.Cms.Api.Infrastructure;
 using Marketplace.Cms.Api.Storage;
 using Marketplace.Cms.Api.Validation;
@@ -26,6 +27,7 @@ builder.Services.AddHttpClient<IStoreDataClient, StoreDataClient>(c =>
     c.BaseAddress = new Uri(builder.Configuration["Services:ShopifySync"] ?? "http://shopifysync:8080"))
     .AddHttpMessageHandler<AuthForwardingHandler>();
 builder.Services.AddScoped<ContentValidator>();
+builder.Services.AddScoped<SnapshotBuilder>();
 
 builder.Services.AddKeycloakJwtAuth(builder.Configuration, builder.Environment);
 
@@ -46,6 +48,7 @@ app.UseAuthorization();
 
 app.MapHealthChecks("/health");
 app.MapPageEndpoints();
+app.MapExperienceEndpoints();
 app.MapPreviewEndpoints();
 app.MapMediaEndpoints();
 

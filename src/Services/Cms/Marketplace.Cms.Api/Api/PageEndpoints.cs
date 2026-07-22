@@ -3,6 +3,7 @@ using System.Text.Json;
 using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.Cms.Api.Components;
 using Marketplace.Cms.Api.Domain;
+using Marketplace.Cms.Api.Experience;
 using Marketplace.Cms.Api.Infrastructure;
 using Marketplace.Cms.Api.Validation;
 using Microsoft.EntityFrameworkCore;
@@ -60,6 +61,12 @@ public static class PageEndpoints
             var handle = req.Handle.Trim().ToLowerInvariant();
             if (await db.Pages.AnyAsync(p => p.Handle == handle, ct))
                 return Problem($"Bu kısa ad zaten kullanılıyor: '{handle}'", StatusCodes.Status409Conflict, "page.handle_exists");
+
+            // Tekil ekranlar (ana sayfa, ürün listeleme, ürün detay, sepet) mağaza başına bir kez tanımlanır;
+            // aksi hâlde mobil tarafta hangi sayfanın gösterileceği belirsiz kalır.
+            if (ScreenTypes.IsSingleton(screen) && await db.Pages.AnyAsync(p => p.ScreenType == screen, ct))
+                return Problem($"'{screen}' ekranı için bu mağazada zaten bir sayfa var. Mevcut sayfayı düzenleyin veya silin.",
+                    StatusCodes.Status409Conflict, "page.screen_exists");
 
             var page = new Page { ScreenType = screen, Name = req.Name.Trim(), Handle = handle };
             page.Versions.Add(new PageVersion { VersionNumber = 1, Status = VersionStatus.Draft });
@@ -242,7 +249,7 @@ public static class PageEndpoints
 
         // --- Yayın döngüsü ---
         group.MapPost("/{id:guid}/publish", async (Guid id, PublishRequest? req, ClaimsPrincipal user,
-            CmsDbContext db, ContentValidator validator, CancellationToken ct) =>
+            CmsDbContext db, ContentValidator validator, SnapshotBuilder snapshots, CancellationToken ct) =>
         {
             var page = await LoadPageAsync(db, id, ct);
             if (page is null) return PageNotFound(id);
@@ -274,7 +281,12 @@ public static class PageEndpoints
             page.PublishedVersionId = draft.Id;
 
             await db.SaveChangesAsync(ct);
-            return Results.Ok(await BuildDetailAsync(db, id, ct));
+
+            // Yayın, mobil uygulamanın okuduğu yapılandırmanın yeni bir sürümünü doğurur.
+            var snapshot = await snapshots.RebuildAsync("publish", draft.PublishedBy, ct);
+
+            var detail = await BuildDetailAsync(db, id, ct);
+            return Results.Ok(new { page = detail, experienceVersion = snapshot.Version });
         });
 
         // --- Önizleme kanalı: yayınlanmamış taslağı test cihazında görmek için süreli anahtar ---

@@ -13,6 +13,17 @@ public enum ScreenType
     Landing = 5         // Landing page
 }
 
+public static class ScreenTypes
+{
+    /// <summary>
+    /// Uygulamada TEK bir örneği olabilen ekranlar. Bunlar için mağaza başına birden fazla sayfa
+    /// tanımlanamaz; aksi hâlde mobil tarafta hangi sayfanın gösterileceği belirsiz kalır.
+    /// Kampanya ve landing sayfaları çoklu olabilir (handle ile ayrışır).
+    /// </summary>
+    public static bool IsSingleton(ScreenType type) => type is
+        ScreenType.Home or ScreenType.ProductList or ScreenType.ProductDetail or ScreenType.Cart;
+}
+
 /// <summary>İçerik yaşam döngüsü durumu.</summary>
 public enum VersionStatus
 {

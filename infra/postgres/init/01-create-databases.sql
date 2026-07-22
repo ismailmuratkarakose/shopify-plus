@@ -4,3 +4,4 @@
 CREATE DATABASE merchant;
 CREATE DATABASE shopifysync;
 CREATE DATABASE cms;
+CREATE DATABASE mobile;

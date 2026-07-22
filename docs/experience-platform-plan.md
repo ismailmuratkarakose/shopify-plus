@@ -128,7 +128,30 @@ Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
     anonim önizlemede yayınlanmamış taslağın görünmesi, geçersiz anahtarda 404.
 - Çıktı: web panelin çağıracağı CMS API'leri (UI ayrı ekip). ✅
 
-### Faz D — Remote Config + Mobile Experience API
+### Faz D — Remote Config + Mobile Experience API  ✅ TAMAMLANDI (2026-07-22)
+- **CMS tarafı:** `FeatureFlag` (aç/kapa + değer) CRUD; **`ExperienceSnapshot`** — yayınlanan içeriğin
+  DEĞİŞMEZ, sürümlü anlık görüntüsü. Her yayın veya bayrak değişikliği yeni sürüm doğurur.
+  Uçlar: `/api/flags`, `GET /api/experience/current` (**ETag = sürüm**, `If-None-Match` → 304),
+  `/api/experience/versions`, `/rebuild`. Mobil taraf CMS'in iç modeline değil bu sabit sözleşmeye bağlanır.
+- **Yeni servis `Marketplace.Mobile.Api`** (port 8088, db `mobile`):
+  - `GET /api/mobile/experience/` — açılış çağrısı: sürüm + bayraklar + ekran listesi.
+  - `GET /api/mobile/experience/{ekran}` — ekran düzeni (ScreenType veya handle ile çözülür), **ETag**'li.
+  - **Snapshot önbelleği** (`ExperienceCache`, mağaza başına, TTL sonrası ETag ile yeniden doğrulama);
+    CMS'e ulaşılamazsa bayat sürümle devam edilir → mobil ekran boş kalmaz.
+  - Katalog: `/products` (arama, marka, fiyat aralığı, sıralama, sayfalama), `/products/{id}`
+    (görüntüleme "son gezilenler"e yazılır), `/collections`, `/collections/{id}/products`.
+  - Kullanıcı listeleri: `/favorites` (ekle/çıkar/listele), `/recently-viewed` — kalıcı, kullanıcı+mağaza bazlı.
+  - `POST /api/mobile/checkout` → **Shopify sepet bağlantısı** üretir; ödeme Shopify Checkout'ta tamamlanır.
+- **Tekil ekran kısıtı (hata düzeltmesi):** Ana Sayfa/Ürün Listeleme/Ürün Detay/Sepet ekranları mağaza
+  başına TEK olabilir (`ScreenTypes.IsSingleton`); aksi hâlde mobilde hangi sayfanın gösterileceği
+  belirsizdi ve eski sayfa dönüyordu. İkinci deneme 409; kampanya/landing çoklu kalır.
+- Migration'lar: CmsExperienceAndFlags, InitialMobile. Doğrulandı (smokeG): yayın→snapshot(v4)→bayrak(v5)
+  →mobil ekran→304 önbellek→katalog/arama/filtre→detay→koleksiyon→favori→checkout URL→yeni yayın(v6)
+  mobilde göründü.
+- **İleriye bırakılan:** Shopify müşteri hesabı ile giriş/kayıt (gerçek Shopify app gerektirir; görev
+  listesinde D-10).
+
+### Faz D — kapsam notları (özgün plan)
 - Mobilin **app-güncellemesiz** çektiği sürümlü config: sayfa düzenleri, banner, kampanya, tema,
   **feature flag** (özellik aç/kapa), deep link yönlendirmeleri, kişiselleştirme alanları.
 - Publish'e bağlı yayın; preview kanalı (test cihazı); ETag/cache + CDN dostu.

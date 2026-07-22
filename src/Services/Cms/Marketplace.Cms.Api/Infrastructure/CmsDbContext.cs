@@ -18,6 +18,8 @@ public class CmsDbContext : DbContext
     public DbSet<PageComponent> PageComponents => Set<PageComponent>();
     public DbSet<PreviewToken> PreviewTokens => Set<PreviewToken>();
     public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
+    public DbSet<FeatureFlag> FeatureFlags => Set<FeatureFlag>();
+    public DbSet<ExperienceSnapshot> ExperienceSnapshots => Set<ExperienceSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -73,6 +75,26 @@ public class CmsDbContext : DbContext
             e.Property(x => x.StoragePath).HasMaxLength(500).IsRequired();
             e.Property(x => x.UploadedBy).HasMaxLength(200);
             e.HasIndex(x => new { x.TenantId, x.CreatedAt });
+            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+        });
+
+        modelBuilder.Entity<FeatureFlag>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Key).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Value).HasMaxLength(500);
+            e.Property(x => x.Description).HasMaxLength(500);
+            e.HasIndex(x => new { x.TenantId, x.Key }).IsUnique();
+            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+        });
+
+        modelBuilder.Entity<ExperienceSnapshot>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Json).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.GeneratedBy).HasMaxLength(200);
+            e.Property(x => x.Reason).HasMaxLength(30).IsRequired();
+            e.HasIndex(x => new { x.TenantId, x.Version }).IsUnique();
             e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
         });
 

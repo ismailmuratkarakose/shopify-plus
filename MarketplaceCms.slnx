@@ -16,6 +16,9 @@
   <Folder Name="/src/Services/Merchant/">
     <Project Path="src/Services/Merchant/Marketplace.Merchant.Api/Marketplace.Merchant.Api.csproj" />
   </Folder>
+  <Folder Name="/src/Services/Mobile/">
+    <Project Path="src/Services/Mobile/Marketplace.Mobile.Api/Marketplace.Mobile.Api.csproj" />
+  </Folder>
   <Folder Name="/src/Services/ShopifySync/">
     <Project Path="src/Services/ShopifySync/Marketplace.ShopifySync.Api/Marketplace.ShopifySync.Api.csproj" />
   </Folder>

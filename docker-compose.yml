@@ -84,6 +84,23 @@ services:
       postgres:
         condition: service_healthy
 
+  mobile:
+    build:
+      context: .
+      dockerfile: src/Services/Mobile/Marketplace.Mobile.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__MobileDb: "Host=postgres;Port=5432;Database=mobile;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
+      Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
+      Services__Cms: "http://cms:8080"
+      Services__ShopifySync: "http://shopifysync:8080"
+      Experience__CacheTtlSeconds: ${EXPERIENCE_CACHE_TTL_SEC:-30}
+    ports:
+      - "8088:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   shopifysync:
     build:
       context: .
@@ -122,9 +139,11 @@ services:
       ReverseProxy__Clusters__merchant-cluster__Destinations__merchant__Address: "http://merchant:8080/"
       ReverseProxy__Clusters__shopify-cluster__Destinations__shopify__Address: "http://shopifysync:8080/"
       ReverseProxy__Clusters__cms-cluster__Destinations__cms__Address: "http://cms:8080/"
+      ReverseProxy__Clusters__mobile-cluster__Destinations__mobile__Address: "http://mobile:8080/"
     ports:
       - "8081:8080"
     depends_on:
       - merchant
       - shopifysync
       - cms
+      - mobile
