@@ -34,16 +34,19 @@ Bu döküman ise farklı bir ürün tarif ediyor:
 | Payment servisi + iyzico/PayPal (Faz 3) | 🔴 Gereksiz | arşivle (checkout Shopify'da) |
 | Order **saga** + komisyon (Faz 3/5/7) | 🔴 Uyumsuz | Order → Shopify sipariş read-model'i (saga yok); komisyon kaldır |
 
-## 3. Yeniden hizalama (Faz A'da arşivlenecek/dönüşecek)
+## 3. Yeniden hizalama — SİLİNDİ (2026-07-22)
 
-- **Arşiv (kaldır/pasifleştir):** Payment servisi, ödeme sağlayıcıları, Order saga (place→reserve→pay→compensate),
-  Catalog master/offer, kendi Inventory rezervasyonu, komisyon raporlaması.
-- **Dönüştür:** Catalog+Inventory+Order → Shopify'dan senkronlanan **read-model'ler** (ürün/koleksiyon/stok/
-  fiyat/sipariş/müşteri). Bunlar tek bir "Store Data / Commerce Read-Model" servisinde toplanabilir veya
-  ShopifySync altında konsolide edilebilir (Faz B'de netleşecek).
-- **Koru:** altyapı, Merchant→Store, ShopifySync, BFF, BuildingBlocks, Reporting temelleri.
+Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
+- **Silinen servisler:** Catalog (master/offer), Inventory (rezervasyon), Order (saga), Payment (saga),
+  Reporting (komisyon), BFF (pazaryeri checkout). → 6 servis, ~75 dosya.
+- **Contracts** Store yaşam döngüsüne indirgendi (yalnızca `MerchantRegistered` + `MerchantIntegrationConfigured`).
+- **ShopifySync:** outbound `ProductCreatedConsumer` silindi; webhook processor artık read-model'i günceller
+  (event yayınlamıyor) — pull-sync'in incremental tamamlayıcısı.
+- **compose/gateway/init/slnx/README** temizlendi. Kalan konteynerler: postgres, rabbitmq, keycloak,
+  **merchant**, **shopifysync**, **gateway**.
+- **Koru & yeniden yaz:** Mobile Experience API (BFF yerine) → Faz D; Analitik (Reporting yerine) → Faz K.
 
-> Not: Arşivlenen kod git geçmişinde durur; silinmez, `deprecated`/derlemeden çıkarma ile pasifleştirilir.
+> Silinen kod git geçmişinde durur (commit'ler). Geri kazanım gerekirse geçmişten alınabilir.
 
 ## 4. Fazlı yol haritası (çekirdek A–L, opsiyonel N; UI hariç)
 

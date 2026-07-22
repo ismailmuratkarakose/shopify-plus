@@ -1,7 +1,5 @@
 using System.Text.Json;
 using Marketplace.BuildingBlocks.MultiTenancy;
-using Marketplace.BuildingBlocks.Outbox;
-using Marketplace.Contracts;
 using Marketplace.ShopifySync.Api.Domain;
 using Marketplace.ShopifySync.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +8,8 @@ namespace Marketplace.ShopifySync.Api.Webhooks;
 
 /// <summary>
 /// Shopify webhook'larını işler: HMAC doğrula → idempotency (webhook-id) → shop→tenant çöz →
-/// payload parse → integration event'i outbox'a yaz. Secret ve idempotency aynı transaction'da.
+/// payload parse → read-model'i (SyncedProduct/Variant) günceller. Shopify kaynak sistemdir;
+/// webhook incremental senkron sağlar (pull-sync'in tamamlayıcısı).
 /// </summary>
 public sealed class ShopifyWebhookProcessor
 {
@@ -43,45 +42,53 @@ public sealed class ShopifyWebhookProcessor
         var shopifyProductId = root.GetProperty("id").GetInt64();
         var title = root.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "";
         var description = root.TryGetProperty("body_html", out var b) ? b.GetString() : null;
+        var vendor = root.TryGetProperty("vendor", out var vn) ? vn.GetString() : null;
+        var productType = root.TryGetProperty("product_type", out var pt) ? pt.GetString() : null;
+        var handle = root.TryGetProperty("handle", out var h) ? h.GetString() ?? "" : "";
+        var status = root.TryGetProperty("status", out var st) ? st.GetString() ?? "active" : "active";
         var updatedAt = root.TryGetProperty("updated_at", out var u) && u.TryGetDateTimeOffset(out var dto)
             ? dto : DateTimeOffset.UtcNow;
-        var currency = root.TryGetProperty("currency", out var c) ? c.GetString() ?? "TRY" : "TRY";
 
-        string sku = "";
-        decimal price = 0;
-        if (root.TryGetProperty("variants", out var variants) && variants.GetArrayLength() > 0)
+        var variants = new List<SyncedVariant>();
+        if (root.TryGetProperty("variants", out var vs) && vs.ValueKind == JsonValueKind.Array)
         {
-            var v = variants[0];
-            sku = v.TryGetProperty("sku", out var s) ? s.GetString() ?? "" : "";
-            if (v.TryGetProperty("price", out var p))
-                price = p.ValueKind == JsonValueKind.String ? decimal.Parse(p.GetString()!) : p.GetDecimal();
+            foreach (var v in vs.EnumerateArray())
+            {
+                decimal price = 0;
+                if (v.TryGetProperty("price", out var p))
+                    price = p.ValueKind == JsonValueKind.String ? decimal.Parse(p.GetString()!) : p.GetDecimal();
+                variants.Add(new SyncedVariant
+                {
+                    ShopifyVariantId = v.TryGetProperty("id", out var vid) ? vid.GetInt64() : 0,
+                    Sku = v.TryGetProperty("sku", out var s) ? s.GetString() : null,
+                    Barcode = v.TryGetProperty("barcode", out var bc) ? bc.GetString() : null,
+                    Price = price,
+                    InventoryQuantity = v.TryGetProperty("inventory_quantity", out var iq) ? iq.GetInt32() : 0,
+                    Title = v.TryGetProperty("title", out var vt) ? vt.GetString() : null
+                });
+            }
         }
 
-        if (string.IsNullOrEmpty(sku))
-            return Results.BadRequest(new { message = "SKU'suz ürün webhook'u atlandı." });
-
-        // Eşlemeyi Sku ile upsert (ShopifyProductId'i tut).
-        var mapping = await _db.ProductMappings.FirstOrDefaultAsync(m => m.Sku == sku, ct);
-        if (mapping is null)
-            _db.ProductMappings.Add(new ProductMapping { TenantId = pre.TenantId, Sku = sku, ShopifyProductId = shopifyProductId });
-        else
-            mapping.ShopifyProductId = shopifyProductId;
-
-        _db.EnqueueIntegrationEvent(new ProductUpsertedFromShopifyIntegrationEvent
+        var product = await _db.SyncedProducts.Include(x => x.Variants)
+            .FirstOrDefaultAsync(x => x.ShopifyProductId == shopifyProductId, ct);
+        if (product is null)
         {
-            TenantId = pre.TenantId,
-            ShopifyProductId = shopifyProductId,
-            Sku = sku,
-            Title = title,
-            Description = description,
-            Price = price,
-            Currency = currency,
-            ShopifyUpdatedAt = updatedAt
-        });
+            product = new SyncedProduct { TenantId = pre.TenantId, ShopifyProductId = shopifyProductId };
+            _db.SyncedProducts.Add(product);
+        }
+        product.Title = title;
+        product.Description = description;
+        product.Vendor = vendor;
+        product.ProductType = productType;
+        product.Handle = string.IsNullOrEmpty(handle) ? title.ToLowerInvariant().Replace(' ', '-') : handle;
+        product.Status = status;
+        product.ShopifyUpdatedAt = updatedAt;
+        product.Variants.Clear();
+        foreach (var v in variants) product.Variants.Add(v);
 
         await CompleteAsync(pre, ct);
-        _logger.LogInformation("Shopify inbound ürün: sku={Sku} shopifyId={Id} tenant={Tenant}", sku, shopifyProductId, pre.TenantId);
-        return Results.Ok(new { status = "processed", sku });
+        _logger.LogInformation("Shopify inbound ürün → read-model: shopifyId={Id} tenant={Tenant}", shopifyProductId, pre.TenantId);
+        return Results.Ok(new { status = "processed", shopifyProductId });
     }
 
     public async Task<IResult> HandleInventoryAsync(HttpContext ctx, CancellationToken ct)
@@ -93,23 +100,20 @@ public sealed class ShopifyWebhookProcessor
         using var doc = JsonDocument.Parse(pre.RawBody);
         var root = doc.RootElement;
 
-        // Gerçek Shopify inventory_levels/update: inventory_item_id + available.
-        // Simulator/Faz 2: sku taşır (inventory_item_id→sku eşlemesi gerçek mağazada tutulacak).
         var sku = root.TryGetProperty("sku", out var s) ? s.GetString() ?? "" : "";
         var available = root.TryGetProperty("available", out var a) ? a.GetInt32() : 0;
-
         if (string.IsNullOrEmpty(sku))
-            return Results.BadRequest(new { message = "SKU'suz stok webhook'u (inventory_item_id eşlemesi Faz 2b+)." });
+            return Results.BadRequest(new { message = "SKU'suz stok webhook'u (inventory_item_id eşlemesi ileride)." });
 
-        _db.EnqueueIntegrationEvent(new StockChangedFromShopifyIntegrationEvent
-        {
-            TenantId = pre.TenantId,
-            Sku = sku,
-            QuantityOnHand = available
-        });
+        var product = await _db.SyncedProducts.Include(x => x.Variants)
+            .FirstOrDefaultAsync(x => x.Variants.Any(v => v.Sku == sku), ct);
+        var variant = product?.Variants.FirstOrDefault(v => v.Sku == sku);
+        if (variant is null)
+            return Results.NotFound(new { message = $"SKU için read-model varyantı yok: {sku}" });
 
+        variant.InventoryQuantity = available;
         await CompleteAsync(pre, ct);
-        _logger.LogInformation("Shopify inbound stok: sku={Sku} available={Qty} tenant={Tenant}", sku, available, pre.TenantId);
+        _logger.LogInformation("Shopify inbound stok → read-model: sku={Sku} available={Qty} tenant={Tenant}", sku, available, pre.TenantId);
         return Results.Ok(new { status = "processed", sku, available });
     }
 

@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${CATALOG_DB_NAME:-catalog}
+      POSTGRES_DB: postgres
     ports:
       - "5432:5432"
     volumes:
@@ -17,11 +17,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -48,26 +43,7 @@ services:
     volumes:
       - ./infra/keycloak:/opt/keycloak/data/import
 
-  catalog:
-    build:
-      context: .
-      dockerfile: src/Services/Catalog/Marketplace.Catalog.Api/Dockerfile
-    environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__CatalogDb: "Host=postgres;Port=5432;Database=${CATALOG_DB_NAME:-catalog};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
-      RabbitMq__Host: rabbitmq
-      RabbitMq__Username: ${RABBITMQ_USER:-guest}
-      RabbitMq__Password: ${RABBITMQ_PASS:-guest}
-      Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
-      Keycloak__Audience: account
-    ports:
-      - "8082:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-
+  # Store (mağaza) hesabı + şifreli Shopify entegrasyon config
   merchant:
     build:
       context: .
@@ -89,44 +65,7 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  inventory:
-    build:
-      context: .
-      dockerfile: src/Services/Inventory/Marketplace.Inventory.Api/Dockerfile
-    environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__InventoryDb: "Host=postgres;Port=5432;Database=inventory;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
-      RabbitMq__Host: rabbitmq
-      RabbitMq__Username: ${RABBITMQ_USER:-guest}
-      RabbitMq__Password: ${RABBITMQ_PASS:-guest}
-      Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
-    ports:
-      - "8084:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-
-  order:
-    build:
-      context: .
-      dockerfile: src/Services/Order/Marketplace.Order.Api/Dockerfile
-    environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__OrderDb: "Host=postgres;Port=5432;Database=ordering;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
-      RabbitMq__Host: rabbitmq
-      RabbitMq__Username: ${RABBITMQ_USER:-guest}
-      RabbitMq__Password: ${RABBITMQ_PASS:-guest}
-      Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
-    ports:
-      - "8085:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-
+  # Store Data: Shopify bağlama (OAuth) + read-model senkronu (ürün/koleksiyon...)
   shopifysync:
     build:
       context: .
@@ -151,66 +90,6 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  payment:
-    build:
-      context: .
-      dockerfile: src/Services/Payment/Marketplace.Payment.Api/Dockerfile
-    environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__PaymentDb: "Host=postgres;Port=5432;Database=payment;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
-      RabbitMq__Host: rabbitmq
-      RabbitMq__Username: ${RABBITMQ_USER:-guest}
-      RabbitMq__Password: ${RABBITMQ_PASS:-guest}
-      Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
-      Merchant__InternalBaseUrl: "http://merchant:8080"
-      Internal__ApiKey: ${INTERNAL_API_KEY:-dev-internal-key-change-me}
-      Payment__Mode: ${PAYMENT_MODE:-simulator}
-    ports:
-      - "8087:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-
-  reporting:
-    build:
-      context: .
-      dockerfile: src/Services/Reporting/Marketplace.Reporting.Api/Dockerfile
-    environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__ReportingDb: "Host=postgres;Port=5432;Database=reporting;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
-      RabbitMq__Host: rabbitmq
-      RabbitMq__Username: ${RABBITMQ_USER:-guest}
-      RabbitMq__Password: ${RABBITMQ_PASS:-guest}
-      Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
-    ports:
-      - "8089:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-
-  bff:
-    build:
-      context: .
-      dockerfile: src/Bff/Marketplace.Bff.Mobile.Api/Dockerfile
-    environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
-      Redis__Configuration: "redis:6379"
-      Services__Catalog: "http://catalog:8080"
-      Services__Inventory: "http://inventory:8080"
-      Services__Order: "http://order:8080"
-    ports:
-      - "8088:8080"
-    depends_on:
-      - redis
-      - catalog
-      - inventory
-      - order
-
   gateway:
     build:
       context: .
@@ -218,22 +97,10 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
-      ReverseProxy__Clusters__catalog-cluster__Destinations__catalog__Address: "http://catalog:8080/"
       ReverseProxy__Clusters__merchant-cluster__Destinations__merchant__Address: "http://merchant:8080/"
-      ReverseProxy__Clusters__inventory-cluster__Destinations__inventory__Address: "http://inventory:8080/"
-      ReverseProxy__Clusters__order-cluster__Destinations__order__Address: "http://order:8080/"
       ReverseProxy__Clusters__shopify-cluster__Destinations__shopify__Address: "http://shopifysync:8080/"
-      ReverseProxy__Clusters__payment-cluster__Destinations__payment__Address: "http://payment:8080/"
-      ReverseProxy__Clusters__bff-cluster__Destinations__bff__Address: "http://bff:8080/"
-      ReverseProxy__Clusters__reporting-cluster__Destinations__reporting__Address: "http://reporting:8080/"
     ports:
       - "8081:8080"
     depends_on:
-      - catalog
       - merchant
-      - inventory
-      - order
       - shopifysync
-      - payment
-      - bff
-      - reporting

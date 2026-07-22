@@ -39,22 +39,21 @@ Mobil / Merchant Paneli / Owner Paneli
 
 ## Repo yapısı
 
+> **Not:** Proje **Shopify Mobil Deneyim & Kişiselleştirme Platformu**na dönüştürülüyor
+> (bkz [docs/experience-platform-plan.md](docs/experience-platform-plan.md)). Eski pazaryeri servisleri
+> (Catalog/Inventory/Order/Payment/Reporting/BFF) **silindi**; checkout/ödeme/sipariş Shopify'ındır.
+
 ```
 src/
   BuildingBlocks/Marketplace.BuildingBlocks   # Result, ITenantContext, Outbox, Secret şifreleme, ortak Web (auth/tenant)
-  Contracts/Marketplace.Contracts             # Servisler arası paylaşılan integration event tipleri
-  Gateway/Marketplace.Gateway                 # YARP reverse proxy + auth + rate limit
-  Services/Catalog/Marketplace.Catalog.Api    # Global ürün master (barkod) + merchant teklif (offer); satıcı kıyası (outbox'lu)
-  Services/Merchant/Marketplace.Merchant.Api  # Merchant onboarding + şifreli Shopify/ödeme config (outbox'lu)
-  Services/Inventory/Marketplace.Inventory.Api # Stok + event consumer'ları (ProductCreated/OrderPlaced)
-  Services/Order/Marketplace.Order.Api        # Sipariş + stok rezervasyon koreografisi
-  Services/ShopifySync/Marketplace.ShopifySync.Api # Shopify çift yönlü senkron (IShopifyClient: simulator/graphql)
-  Services/Payment/Marketplace.Payment.Api    # Ödeme saga (IPaymentProvider: simulator/iyzico/paypal)
-  Services/Reporting/Marketplace.Reporting.Api # Raporlama read-model (event-sourced): komisyon/ciro/owner dashboard
-  Bff/Marketplace.Bff.Mobile.Api              # Mobil BFF: katalog+sepet(Redis)+checkout+sipariş takibi (JWT forwarding)
+  Contracts/Marketplace.Contracts             # Servisler arası paylaşılan event tipleri (Store yaşam döngüsü)
+  Gateway/Marketplace.Gateway                 # YARP reverse proxy + auth
+  Services/Merchant/Marketplace.Merchant.Api  # Store (mağaza) hesabı + şifreli Shopify entegrasyon config
+  Services/ShopifySync/Marketplace.ShopifySync.Api # Store Data: Shopify bağlama (OAuth) + read-model senkronu (ürün/koleksiyon)
 infra/keycloak/marketplace-realm.json         # Keycloak realm import
 infra/postgres/init/                          # db-per-service oluşturma scriptleri
-docs/architecture.md                          # Detaylı mimari + yol haritası
+docs/architecture.md                          # (tarihsel) pazaryeri mimarisi
+docs/experience-platform-plan.md              # Aktif: deneyim platformu gap analizi + fazlı plan
 docker-compose.yml                            # Lokal ortam
 ```
 
@@ -74,14 +73,8 @@ Servisler:
 | Servis | Adres |
 |---|---|
 | Gateway | http://localhost:8081 |
-| Catalog (doğrudan) | http://localhost:8082 |
 | Merchant (doğrudan) | http://localhost:8083 |
-| Inventory (doğrudan) | http://localhost:8084 |
-| Order (doğrudan) | http://localhost:8085 |
 | ShopifySync (doğrudan) | http://localhost:8086 |
-| Payment (doğrudan) | http://localhost:8087 |
-| Mobil BFF (doğrudan) | http://localhost:8088 |
-| Reporting (doğrudan) | http://localhost:8089 |
 | Keycloak | http://localhost:8080 (admin/admin) |
 | RabbitMQ yönetim | http://localhost:15672 (guest/guest) |
 | PostgreSQL | localhost:5432 |
@@ -92,14 +85,8 @@ Her API servisi kendi portunda interaktif Swagger UI sunar. **Authorize** düğm
 
 | Servis | Swagger UI | OpenAPI JSON |
 |---|---|---|
-| Catalog | http://localhost:8082/swagger | http://localhost:8082/openapi/v1.json |
 | Merchant | http://localhost:8083/swagger | http://localhost:8083/openapi/v1.json |
-| Inventory | http://localhost:8084/swagger | http://localhost:8084/openapi/v1.json |
-| Order | http://localhost:8085/swagger | http://localhost:8085/openapi/v1.json |
 | ShopifySync | http://localhost:8086/swagger | http://localhost:8086/openapi/v1.json |
-| Payment | http://localhost:8087/swagger | http://localhost:8087/openapi/v1.json |
-| Mobil BFF | http://localhost:8088/swagger | http://localhost:8088/openapi/v1.json |
-| Reporting | http://localhost:8089/swagger | http://localhost:8089/openapi/v1.json |
 
 Sağlık kontrolü:
 ```bash

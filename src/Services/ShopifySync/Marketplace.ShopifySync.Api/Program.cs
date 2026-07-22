@@ -59,7 +59,6 @@ builder.Services.AddMassTransit(x =>
     // Servise özel kuyruk öneki: farklı servisler aynı consumer adını kullansa bile kuyruklar çakışmaz (fan-out korunur).
     x.SetEndpointNameFormatter(new KebabCaseEndpointNameFormatter("shopify-sync", includeNamespace: false));
     x.AddConsumer<MerchantIntegrationConfiguredConsumer>();
-    x.AddConsumer<ProductCreatedConsumer>();
     x.UsingRabbitMq((context, cfg) =>
     {
         var rmq = builder.Configuration.GetSection("RabbitMq");

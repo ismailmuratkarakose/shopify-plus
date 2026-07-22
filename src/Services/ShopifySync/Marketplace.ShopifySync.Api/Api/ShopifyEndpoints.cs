@@ -21,16 +21,6 @@ public static class ShopifyEndpoints
                 : Results.Ok(new { i.ShopDomain, i.IsActive, tokenStored = !string.IsNullOrEmpty(i.EncryptedAccessToken) });
         });
 
-        // Pazaryeri ↔ Shopify ürün eşlemeleri.
-        group.MapGet("/mappings", async (ShopifySyncDbContext db) =>
-        {
-            var maps = await db.ProductMappings
-                .OrderByDescending(m => m.CreatedAt)
-                .Select(m => new { m.MarketplaceProductId, m.ShopifyProductId, m.Sku })
-                .ToListAsync();
-            return Results.Ok(maps);
-        });
-
         return app;
     }
 }
