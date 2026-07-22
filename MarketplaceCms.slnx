@@ -1,5 +1,8 @@
 <Solution>
   <Folder Name="/src/" />
+  <Folder Name="/src/Bff/">
+    <Project Path="src/Bff/Marketplace.Bff.Mobile.Api/Marketplace.Bff.Mobile.Api.csproj" />
+  </Folder>
   <Folder Name="/src/BuildingBlocks/">
     <Project Path="src/BuildingBlocks/Marketplace.BuildingBlocks/Marketplace.BuildingBlocks.csproj" />
   </Folder>

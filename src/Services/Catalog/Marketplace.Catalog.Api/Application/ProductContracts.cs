@@ -26,6 +26,7 @@ public record CreateProductCommand(
     string Currency) : IRequest<Result<ProductDto>>;
 
 public record GetProductsQuery(int Page = 1, int PageSize = 20) : IRequest<Result<IReadOnlyList<ProductDto>>>;
+public record GetProductByIdQuery(Guid Id) : IRequest<Result<ProductDto>>;
 
 // --- Validation ---
 public sealed class CreateProductValidator : AbstractValidator<CreateProductCommand>

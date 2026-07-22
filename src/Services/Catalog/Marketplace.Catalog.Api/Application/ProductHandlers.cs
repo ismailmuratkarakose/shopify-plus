@@ -102,3 +102,24 @@ public sealed class GetProductsHandler : IRequestHandler<GetProductsQuery, Resul
         return Result.Success<IReadOnlyList<ProductDto>>(items);
     }
 }
+
+public sealed class GetProductByIdHandler : IRequestHandler<GetProductByIdQuery, Result<ProductDto>>
+{
+    private readonly CatalogDbContext _db;
+
+    public GetProductByIdHandler(CatalogDbContext db) => _db = db;
+
+    public async Task<Result<ProductDto>> Handle(GetProductByIdQuery request, CancellationToken ct)
+    {
+        var product = await _db.Products
+            .Where(p => p.Id == request.Id)
+            .Select(p => new ProductDto(
+                p.Id, p.Sku, p.Title, p.Description, p.CategoryId,
+                p.Price, p.Currency, p.IsActive, p.ShopifyProductId, p.Source))
+            .FirstOrDefaultAsync(ct);
+
+        return product is null
+            ? Result.Failure<ProductDto>(Error.NotFound("product.not_found", $"Ürün bulunamadı: {request.Id}"))
+            : Result.Success(product);
+    }
+}

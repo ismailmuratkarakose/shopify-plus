@@ -18,6 +18,12 @@ public static class ProductEndpoints
             return result.ToHttpResult();
         });
 
+        group.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
+        {
+            var result = await sender.Send(new GetProductByIdQuery(id));
+            return result.ToHttpResult();
+        });
+
         group.MapPost("/", async (CreateProductCommand cmd, ISender sender) =>
         {
             var result = await sender.Send(cmd);

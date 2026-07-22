@@ -173,6 +173,25 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  bff:
+    build:
+      context: .
+      dockerfile: src/Bff/Marketplace.Bff.Mobile.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
+      Redis__Configuration: "redis:6379"
+      Services__Catalog: "http://catalog:8080"
+      Services__Inventory: "http://inventory:8080"
+      Services__Order: "http://order:8080"
+    ports:
+      - "8088:8080"
+    depends_on:
+      - redis
+      - catalog
+      - inventory
+      - order
+
   gateway:
     build:
       context: .
@@ -186,6 +205,7 @@ services:
       ReverseProxy__Clusters__order-cluster__Destinations__order__Address: "http://order:8080/"
       ReverseProxy__Clusters__shopify-cluster__Destinations__shopify__Address: "http://shopifysync:8080/"
       ReverseProxy__Clusters__payment-cluster__Destinations__payment__Address: "http://payment:8080/"
+      ReverseProxy__Clusters__bff-cluster__Destinations__bff__Address: "http://bff:8080/"
     ports:
       - "8081:8080"
     depends_on:
@@ -195,3 +215,4 @@ services:
       - order
       - shopifysync
       - payment
+      - bff
