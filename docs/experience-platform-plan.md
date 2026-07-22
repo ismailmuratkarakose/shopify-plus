@@ -91,11 +91,29 @@ Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
   rate-limit + backoff. Bunlar Excel görev listesinde B-13/B-14/B-16 olarak ayrıca eforlandırılmıştır.
 - Çıktı: mağaza verisinin güncel read-model'i; CMS ve kişiselleştirme bunu okur. ✅
 
-### Faz C — Deneyim/İçerik CMS çekirdeği (sürükle-bırak veri modeli)
-- **Ekran/Sayfa** modeli: Home, PLP, PDP, Cart, Campaign, Landing.
-- **Bileşen** modeli: Banner, Ürün gösterim, Koleksiyon, Kampanya, Popup, Kişiselleştirme, Dinamik içerik
-  (sıra, konum, hedefleme, veri bağlama — Shopify koleksiyon/ürün referansları).
-- **İçerik yaşam döngüsü:** Draft → Preview → Publish + **versiyonlama** (geçmiş, geri alma).
+### Faz C — Deneyim/İçerik CMS çekirdeği (sürükle-bırak veri modeli)  🟡 (çekirdek ✅)
+- **Dilim 1 ✅ (2026-07-22) — `Marketplace.Cms.Api` (port 8090, db `cms`):**
+  - **Model:** `Page` (mantıksal ekran; ScreenType: Home/ProductList/ProductDetail/Cart/Campaign/Landing,
+    mağaza içinde benzersiz `handle`) → `PageVersion` (Draft/Published/Archived) → `PageComponent`
+    (tip + sıra + `jsonb` ayarlar). İçerik sayfada değil **sürümde** tutulur: taslak düzenlenirken
+    yayındaki içerik değişmez.
+  - **Bileşen tipleri (7):** banner, product_grid, collection, campaign, popup, personalization,
+    dynamic_content — her biri zorunlu/opsiyonel ayar şemasıyla `ComponentTypes` kayıt defterinde.
+    `GET /api/pages/component-types` tasarımcının paletini besler. Ekleme/güncellemede ayarlar
+    doğrulanır (zorunlu alan, izinli değer listesi ve koşullu kurallar: ör. `source=manual` ise
+    `productIds` zorunlu, `trigger=delay` ise `delaySeconds` zorunlu).
+  - **Uçlar:** sayfa CRUD (`/api/pages`), bileşen ekle/güncelle/sil, **toplu sıralama**
+    (`PUT /{id}/components/order` — sürükle-bırak arka ucu), `POST /{id}/publish`,
+    `GET /{id}/versions`, `POST /{id}/versions/{versionId}/restore`, `GET /{id}/published`.
+  - **Yayın döngüsü:** düzenleme daima taslakta; taslak yoksa yayındaki sürümden kopyalanarak açılır.
+    Yayınlama taslağı dondurur, önceki yayını arşive alır. Geri alma eski sürümü yeni taslağa kopyalar.
+  - Migration: InitialCms. Doğrulandı (smokeE): palet, 3 bileşen, 4 hatalı doğrulama senaryosu,
+    sıralama, yayın, **yayın sonrası düzenlemede yayının bozulmaması**, sürüm geçmişi, geri alma.
+  - **EF tuzağı:** istemcide üretilen anahtarlar (`Guid.NewGuid()` alan başlatıcısı) yüzünden, izlenen
+    bir üst nesnenin koleksiyonuna eklenen yeni alt kayıtlar EF tarafından "mevcut" sayılıp INSERT
+    yerine UPDATE üretiyordu → yeni nesneler DbSet'e **açıkça** eklendi (Added durumu garanti).
+- **Kalan Faz C:** önizleme kanalı (preview token), içerik bütünlük doğrulaması (silinmiş ürün/koleksiyon
+  referansları), medya/görsel yükleme servisi, entegrasyon testleri.
 - Çıktı: web panelin çağıracağı CMS API'leri (UI ayrı ekip).
 
 ### Faz D — Remote Config + Mobile Experience API

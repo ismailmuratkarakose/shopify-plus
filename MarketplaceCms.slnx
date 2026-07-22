@@ -10,6 +10,9 @@
     <Project Path="src/Gateway/Marketplace.Gateway/Marketplace.Gateway.csproj" />
   </Folder>
   <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/Cms/">
+    <Project Path="src/Services/Cms/Marketplace.Cms.Api/Marketplace.Cms.Api.csproj" />
+  </Folder>
   <Folder Name="/src/Services/Merchant/">
     <Project Path="src/Services/Merchant/Marketplace.Merchant.Api/Marketplace.Merchant.Api.csproj" />
   </Folder>

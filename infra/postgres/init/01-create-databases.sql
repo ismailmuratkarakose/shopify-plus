@@ -3,3 +3,4 @@
 -- Mevcut volume'de yeniden çalıştırmak için: rm -rf ./.data
 CREATE DATABASE merchant;
 CREATE DATABASE shopifysync;
+CREATE DATABASE cms;

@@ -66,6 +66,20 @@ services:
         condition: service_healthy
 
   # Store Data: Shopify bağlama (OAuth) + read-model senkronu (ürün/koleksiyon...)
+  cms:
+    build:
+      context: .
+      dockerfile: src/Services/Cms/Marketplace.Cms.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__CmsDb: "Host=postgres;Port=5432;Database=cms;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
+      Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
+    ports:
+      - "8090:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   shopifysync:
     build:
       context: .
@@ -103,8 +117,10 @@ services:
       Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
       ReverseProxy__Clusters__merchant-cluster__Destinations__merchant__Address: "http://merchant:8080/"
       ReverseProxy__Clusters__shopify-cluster__Destinations__shopify__Address: "http://shopifysync:8080/"
+      ReverseProxy__Clusters__cms-cluster__Destinations__cms__Address: "http://cms:8080/"
     ports:
       - "8081:8080"
     depends_on:
       - merchant
       - shopifysync
+      - cms
