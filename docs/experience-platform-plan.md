@@ -2,7 +2,8 @@
 
 > Kaynak: müşteri dökümanı "SHOPIFY MOBİL DENEYİM VE KİŞİSELLEŞTİRME PLATFORMU" (12 sayfa).
 > Karar (2026-07-22): mevcut kod tabanı bu spesifikasyona **dönüştürülecek**; önce zorunlu çekirdek
-> (Faz A–L), opsiyonel modüller (Faz N) sonraya. **Mobil uygulama (React Native) ve web admin UI
+> (Faz A–L), opsiyonel modüller (Faz M) sonraya. **Yapay zeka (AI asistanı ve AI modülleri) kapsam DIŞI —
+> ilgili faz tamamen kaldırıldı.** **Mobil uygulama (React Native) ve web admin UI
 > kapsam dışı**; yalnızca backend/REST API'ler (mobilin ve web panelin *backing* servisleri) inşa edilir.
 
 ## 1. Ürün şekli farkı (kritik)
@@ -28,7 +29,7 @@ Bu döküman ise farklı bir ürün tarif ediyor:
 | ShopifySync (inbound/outbound, HMAC webhook, idempotency, shop→tenant, IShopifyClient) | ✅ Çekirdek — genişlet | tüm Shopify varlıkları için senkron |
 | BFF (JWT forwarding, aggregation) | ✅ Repurpose | "Mobile Experience API" |
 | Reporting (event-sourced read-model) | 🟡 Temel | Analitik/ölçümlemeye evril |
-| `IPaymentProvider` + resolver **deseni** | ✅ Desen olarak | `IAiProvider` vb. için şablon |
+| `IPaymentProvider` + resolver **deseni** | ✅ Desen olarak | sağlayıcı-soyutlaması gereken yerlere şablon |
 | Catalog **master+offer** (Faz 7) | 🔴 Uyumsuz | Shopify ürün read-model'i ile değiştir |
 | Inventory (kendi rezervasyon) | 🔴 Uyumsuz | Shopify stok read-model'i (rezervasyon yok) |
 | Payment servisi + iyzico/PayPal (Faz 3) | 🔴 Gereksiz | arşivle (checkout Shopify'da) |
@@ -48,7 +49,7 @@ Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
 
 > Silinen kod git geçmişinde durur (commit'ler). Geri kazanım gerekirse geçmişten alınabilir.
 
-## 4. Fazlı yol haritası (çekirdek A–L, opsiyonel N; UI hariç)
+## 4. Fazlı yol haritası (çekirdek A–L, opsiyonel M; UI ve AI hariç)
 
 ### Faz A — Yeniden hizalama & Shopify bağlantısı  🟡 (bağlantı ✅)
 - Kavram: tenant = Shopify mağazası. Merchant→Store terminolojisi (kavramsal; toplu rename ertelendi).
@@ -118,19 +119,14 @@ Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
 - Firebase Analytics + GA4 event modeli, ingestion; e-ticaret/kampanya/dönüşüm/davranış raporları.
 - Reporting servisini bu event modeline evir.
 
-### Faz L — AI Asistanı
-- **`IAiProvider` soyutlaması** (OpenAI / Google Gemini / **Anthropic Claude** / Azure OpenAI) —
-  `IPaymentProvider` deseninin aynısı; sağlayıcı config + kota/maliyet.
-- Senaryolar: ürün keşfi, öneri, karşılaştırma, kategori yönlendirme, hediye önerisi, doğal dil ile arama.
-
-### Faz M — Standart entegrasyonlar
+### Faz L — Standart entegrasyonlar
 - **Judge.me** (ürün puan/yorum/foto) read entegrasyonu; **FCM** (Faz H ile).
 
-### Faz N — Opsiyonel modüller (sonraya)
-- Çoklu-mağaza yönetimi, A/B test, gelişmiş segmentasyon, AI banner generator, pazarlama otomasyonu,
-  **Klaviyo**, attribution (**Appsflyer/Adjust**), CRM (Zendesk/Intercom/HubSpot/Salesforce), gelişmiş AI modülleri.
+### Faz M — Opsiyonel modüller (sonraya)
+- Çoklu-mağaza yönetimi, A/B test, gelişmiş segmentasyon, pazarlama otomasyonu,
+  **Klaviyo**, attribution (**Appsflyer/Adjust**), CRM (Zendesk/Intercom/HubSpot/Salesforce).
 
-### Faz O — K8s sertleştirme (eski Faz 6)
+### Faz N — K8s sertleştirme (eski Faz 6)
 - Helm chart'lar, autoscaling, liveness/readiness probe'lar, observability, yük testi.
 - **Compose startup-race** kalıcı fix (healthcheck `depends_on` koşulları).
 
