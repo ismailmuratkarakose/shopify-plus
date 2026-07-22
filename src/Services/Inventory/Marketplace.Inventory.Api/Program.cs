@@ -27,6 +27,7 @@ builder.Services.AddMassTransit(x =>
     x.AddConsumer<ProductCreatedConsumer>();
     x.AddConsumer<OrderPlacedConsumer>();
     x.AddConsumer<StockChangedFromShopifyConsumer>();
+    x.AddConsumer<StockReleaseRequestedConsumer>();
     x.UsingRabbitMq((context, cfg) =>
     {
         var rmq = builder.Configuration.GetSection("RabbitMq");

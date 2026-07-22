@@ -4,9 +4,11 @@ namespace Marketplace.Order.Api.Domain;
 
 public enum OrderStatus
 {
-    Pending = 0,     // oluşturuldu, stok rezervasyonu bekleniyor
-    Confirmed = 1,   // stok rezerve edildi
-    Rejected = 2     // yetersiz stok
+    Pending = 0,          // oluşturuldu, stok rezervasyonu bekleniyor
+    Rejected = 1,         // yetersiz stok
+    AwaitingPayment = 2,  // stok rezerve edildi, ödeme bekleniyor
+    Paid = 3,             // ödeme başarılı (terminal başarı)
+    PaymentFailed = 4     // ödeme başarısız, stok geri bırakıldı
 }
 
 public class Order : AuditableTenantEntity

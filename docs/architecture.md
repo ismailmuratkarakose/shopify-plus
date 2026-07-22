@@ -69,7 +69,7 @@
 | **0** ✅ | İskele | Monorepo, BuildingBlocks, Gateway, Catalog dikey kesiti, docker-compose, Keycloak realm |
 | **1** ✅ | Çekirdek domain | Merchant onboarding + şifreli entegrasyon config, Outbox, ortak Web yapı taşları, `Marketplace.Contracts`, Inventory + Order + event-driven koreografi (sipariş↔stok rezervasyonu) |
 | **2** ✅ | Shopify | ShopifySync servisi, IShopifyClient (simulator/GraphQL), entegrasyon read-model, outbound ürün senkronu + eşleme + döngü önleme, inbound webhook (HMAC-SHA256 + idempotency + shop→tenant), Catalog ürün upsert (çakışma çözümü) + Inventory stok, çift yönlü doğrulandı |
-| **3** | Ödeme | iyzico + PayPal, saga, merchant config |
+| **3** ✅ | Ödeme | Payment servisi, `IPaymentProvider` (simulator + iyzico + PayPal gerçek-yapı), provider resolver (merchant config), Order↔Payment↔Inventory saga + telafi (ödeme başarısızsa stok geri bırakılır) |
 | **4** | Mobil BFF | Katalog listeleme, sepet, checkout, sipariş takibi |
 | **5** | Raporlama + owner | Komisyon, ciro, dashboard API'leri |
 | **6** | K8s sertleştirme | Helm chart'lar, autoscaling, probe'lar, observability, yük testi |
@@ -85,6 +85,7 @@
   - **Outbound (Pazaryeri→Shopify):** `ProductCreated` → `IShopifyClient` (config `Shopify:ClientMode`: simulator/graphql) → push + `ProductMapping` (Sku anahtarlı). Döngü önleme: `Source=shopify` olan ürün tekrar push edilmez.
   - **Inbound (Shopify→Pazaryeri):** webhook endpoint'leri (`/webhooks/shopify/*`, anonim, HMAC-SHA256 ile korunur). Pipeline: raw body HMAC doğrula → `WebhookInbox` ile idempotency (`X-Shopify-Webhook-Id`) → `X-Shopify-Shop-Domain` ile shop→tenant çöz → payload parse → integration event outbox'a. Catalog `ProductUpsertedFromShopify` consumer'ı ürünü Sku ile upsert eder (`Source=shopify`, çakışma: pazaryeri sürümü daha yeniyse atla). Inventory `StockChangedFromShopify` consumer'ı stoğu uygular.
   - **Webhook sıra bağımsızlığı:** stok, ürün/envanter kaydından önce gelebilir → Inventory consumer'ı kayıt yoksa exception atar, `UseMessageRetry` kademeli retry ile kayıt oluşunca uygular.
+- **Ödeme saga (Faz 3, Order↔Payment↔Inventory):** Sipariş → `OrderPlaced` → stok rezerve → `StockReserved` → Order `AwaitingPayment` + `PaymentRequested` → Payment sağlayıcıyı çözer (`IPaymentProvider`: simulator/iyzico/paypal, config `Payment:Mode` + merchant config) → tahsilat → `PaymentSucceeded`/`PaymentFailed`. Order: başarı → `Paid`; başarısızlık → `PaymentFailed` + `StockReleaseRequested` (**telafi**) → Inventory rezerve stoğu geri bırakır. Sağlayıcı credential'ları Merchant internal endpoint'inden çözülür; simülatörde `Payment:Simulator:FailAmount` ile başarısızlık test edilir. Not: dış tahsilat + DB commit tek adımda; prod'da ödeme idempotency-key + iki-aşamalı kayıt önerilir.
 
 ## 10. Açık teknik notlar / kararlar
 

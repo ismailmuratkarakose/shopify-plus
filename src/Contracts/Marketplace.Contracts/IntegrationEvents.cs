@@ -49,6 +49,39 @@ public record StockReservationFailedIntegrationEvent : IntegrationEvent
     public string Reason { get; init; } = default!;
 }
 
+// --- Ödeme saga (Order ↔ Payment ↔ Inventory) ---
+
+/// <summary>Stok rezerve edildikten sonra Order ödeme ister. Payment tüketir.</summary>
+public record PaymentRequestedIntegrationEvent : IntegrationEvent
+{
+    public Guid OrderId { get; init; }
+    public decimal Amount { get; init; }
+    public string Currency { get; init; } = default!;
+}
+
+/// <summary>Ödeme başarılı. Order siparişi Paid yapar.</summary>
+public record PaymentSucceededIntegrationEvent : IntegrationEvent
+{
+    public Guid OrderId { get; init; }
+    public Guid PaymentId { get; init; }
+    public string Provider { get; init; } = default!;
+    public string ProviderPaymentId { get; init; } = default!;
+}
+
+/// <summary>Ödeme başarısız. Order siparişi PaymentFailed yapar + stok rezervini geri bırakır.</summary>
+public record PaymentFailedIntegrationEvent : IntegrationEvent
+{
+    public Guid OrderId { get; init; }
+    public string Reason { get; init; } = default!;
+}
+
+/// <summary>Ödeme başarısız olunca rezerve edilen stoğun geri bırakılması (telafi). Inventory tüketir.</summary>
+public record StockReleaseRequestedIntegrationEvent : IntegrationEvent
+{
+    public Guid OrderId { get; init; }
+    public IReadOnlyList<OrderLine> Lines { get; init; } = [];
+}
+
 // --- Shopify inbound (Shopify → Pazaryeri) ---
 
 /// <summary>Shopify'dan ürün oluştu/güncellendi webhook'u. Catalog upsert eder (Source=shopify).</summary>

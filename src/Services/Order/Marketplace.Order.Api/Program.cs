@@ -28,6 +28,8 @@ builder.Services.AddMassTransit(x =>
     x.SetEndpointNameFormatter(new KebabCaseEndpointNameFormatter("order", includeNamespace: false));
     x.AddConsumer<StockReservedConsumer>();
     x.AddConsumer<StockReservationFailedConsumer>();
+    x.AddConsumer<PaymentSucceededConsumer>();
+    x.AddConsumer<PaymentFailedConsumer>();
     x.UsingRabbitMq((context, cfg) =>
     {
         var rmq = builder.Configuration.GetSection("RabbitMq");

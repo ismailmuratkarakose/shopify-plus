@@ -5,3 +5,4 @@ CREATE DATABASE merchant;
 CREATE DATABASE inventory;
 CREATE DATABASE ordering;
 CREATE DATABASE shopifysync;
+CREATE DATABASE payment;

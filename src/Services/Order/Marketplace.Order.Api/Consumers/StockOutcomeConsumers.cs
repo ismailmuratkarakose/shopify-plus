@@ -1,4 +1,5 @@
 using Marketplace.BuildingBlocks.MultiTenancy;
+using Marketplace.BuildingBlocks.Outbox;
 using Marketplace.Contracts;
 using Marketplace.Order.Api.Domain;
 using Marketplace.Order.Api.Infrastructure;
@@ -7,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Marketplace.Order.Api.Consumers;
 
-/// <summary>Inventory stok rezerve edince siparişi onaylar.</summary>
+/// <summary>Stok rezerve edildi → sipariş ödeme bekliyor; ödeme talebi yayınlanır.</summary>
 public sealed class StockReservedConsumer : IConsumer<StockReservedIntegrationEvent>
 {
     private readonly OrderDbContext _db;
@@ -28,7 +29,14 @@ public sealed class StockReservedConsumer : IConsumer<StockReservedIntegrationEv
         var order = await _db.Orders.FirstOrDefaultAsync(o => o.Id == e.OrderId, context.CancellationToken);
         if (order is null || order.Status != OrderStatus.Pending) return; // idempotent
 
-        order.Status = OrderStatus.Confirmed;
+        order.Status = OrderStatus.AwaitingPayment;
+        _db.EnqueueIntegrationEvent(new PaymentRequestedIntegrationEvent
+        {
+            TenantId = e.TenantId,
+            OrderId = order.Id,
+            Amount = order.TotalAmount,
+            Currency = order.Currency
+        });
         await _db.SaveChangesAsync(context.CancellationToken);
     }
 }

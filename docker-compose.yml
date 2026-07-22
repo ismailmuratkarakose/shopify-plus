@@ -151,6 +151,28 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  payment:
+    build:
+      context: .
+      dockerfile: src/Services/Payment/Marketplace.Payment.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__PaymentDb: "Host=postgres;Port=5432;Database=payment;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Username: ${RABBITMQ_USER:-guest}
+      RabbitMq__Password: ${RABBITMQ_PASS:-guest}
+      Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
+      Merchant__InternalBaseUrl: "http://merchant:8080"
+      Internal__ApiKey: ${INTERNAL_API_KEY:-dev-internal-key-change-me}
+      Payment__Mode: ${PAYMENT_MODE:-simulator}
+    ports:
+      - "8087:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
   gateway:
     build:
       context: .
@@ -163,6 +185,7 @@ services:
       ReverseProxy__Clusters__inventory-cluster__Destinations__inventory__Address: "http://inventory:8080/"
       ReverseProxy__Clusters__order-cluster__Destinations__order__Address: "http://order:8080/"
       ReverseProxy__Clusters__shopify-cluster__Destinations__shopify__Address: "http://shopifysync:8080/"
+      ReverseProxy__Clusters__payment-cluster__Destinations__payment__Address: "http://payment:8080/"
     ports:
       - "8081:8080"
     depends_on:
@@ -171,3 +194,4 @@ services:
       - inventory
       - order
       - shopifysync
+      - payment
