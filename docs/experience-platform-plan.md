@@ -91,7 +91,7 @@ Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
   rate-limit + backoff. Bunlar Excel görev listesinde B-13/B-14/B-16 olarak ayrıca eforlandırılmıştır.
 - Çıktı: mağaza verisinin güncel read-model'i; CMS ve kişiselleştirme bunu okur. ✅
 
-### Faz C — Deneyim/İçerik CMS çekirdeği (sürükle-bırak veri modeli)  🟡 (çekirdek ✅)
+### Faz C — Deneyim/İçerik CMS çekirdeği (sürükle-bırak veri modeli)  ✅ TAMAMLANDI
 - **Dilim 1 ✅ (2026-07-22) — `Marketplace.Cms.Api` (port 8090, db `cms`):**
   - **Model:** `Page` (mantıksal ekran; ScreenType: Home/ProductList/ProductDetail/Cart/Campaign/Landing,
     mağaza içinde benzersiz `handle`) → `PageVersion` (Draft/Published/Archived) → `PageComponent`
@@ -112,9 +112,21 @@ Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
   - **EF tuzağı:** istemcide üretilen anahtarlar (`Guid.NewGuid()` alan başlatıcısı) yüzünden, izlenen
     bir üst nesnenin koleksiyonuna eklenen yeni alt kayıtlar EF tarafından "mevcut" sayılıp INSERT
     yerine UPDATE üretiyordu → yeni nesneler DbSet'e **açıkça** eklendi (Added durumu garanti).
-- **Kalan Faz C:** önizleme kanalı (preview token), içerik bütünlük doğrulaması (silinmiş ürün/koleksiyon
-  referansları), medya/görsel yükleme servisi, entegrasyon testleri.
-- Çıktı: web panelin çağıracağı CMS API'leri (UI ayrı ekip).
+- **Dilim 2 ✅ (2026-07-22) — önizleme, medya, bütünlük:**
+  - **Önizleme kanalı:** `POST /api/pages/{id}/preview-token` süreli, iptal edilebilir anahtar üretir;
+    `GET /api/preview/{token}` **anonimdir** (test cihazı panele giriş yapmadan taslağı görür) —
+    kiracıyı ve sayfayı anahtar belirler, bu yüzden `PreviewToken` üzerinde tenant filtresi yoktur.
+  - **Medya servisi:** `IMediaStorage` soyutlaması + `LocalFileMediaStorage` (mağaza başına klasör;
+    S3/MinIO aynı arayüzün arkasına eklenebilir). `POST /api/media` (multipart, tip+boyut doğrulaması),
+    liste, silme yetkili; `GET /api/media/{id}/content` **anonim** (mobil/CDN erişimi).
+  - **İçerik bütünlüğü:** `ContentValidator` bileşenlerin işaret ettiği ürün/koleksiyon/indirim
+    kayıtlarını ShopifySync read-model'inden doğrular (`IStoreDataClient`, JWT forward).
+    `GET /api/pages/{id}/validate` sorunları listeler; **yayınlama kırık referans varsa 409 ile engellenir**.
+    Mağaza verisine ulaşılamazsa yalnızca *uyarı* üretilir — altyapı arızası yayını kilitlemez.
+  - Migration: CmsPreviewAndMedia. Doğrulandı (smokeF): medya yükleme/anonim erişim/tip reddi,
+    geçerli içerik doğrulaması, silinmiş koleksiyon tespiti, yayın engelleme, düzeltip yayınlama,
+    anonim önizlemede yayınlanmamış taslağın görünmesi, geçersiz anahtarda 404.
+- Çıktı: web panelin çağıracağı CMS API'leri (UI ayrı ekip). ✅
 
 ### Faz D — Remote Config + Mobile Experience API
 - Mobilin **app-güncellemesiz** çektiği sürümlü config: sayfa düzenleri, banner, kampanya, tema,

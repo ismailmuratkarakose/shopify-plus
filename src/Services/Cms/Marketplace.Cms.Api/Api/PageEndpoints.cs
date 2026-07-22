@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.Cms.Api.Components;
 using Marketplace.Cms.Api.Domain;
 using Marketplace.Cms.Api.Infrastructure;
+using Marketplace.Cms.Api.Validation;
 using Microsoft.EntityFrameworkCore;
 
 namespace Marketplace.Cms.Api.Api;
@@ -214,9 +216,33 @@ public static class PageEndpoints
             return Results.Ok(await BuildDetailAsync(db, id, ct));
         });
 
+        // --- İçerik bütünlüğü ---
+        // Bileşenlerin işaret ettiği ürün/koleksiyon/indirim hâlâ mağazada var mı?
+        group.MapGet("/{id:guid}/validate", async (Guid id, CmsDbContext db, ContentValidator validator, CancellationToken ct) =>
+        {
+            var page = await LoadPageAsync(db, id, ct);
+            if (page is null) return PageNotFound(id);
+
+            var target = page.Versions.FirstOrDefault(v => v.Status == VersionStatus.Draft)
+                         ?? page.Versions.FirstOrDefault(v => v.Id == page.PublishedVersionId);
+            if (target is null)
+                return Problem("Doğrulanacak içerik yok.", StatusCodes.Status404NotFound, "page.no_content");
+
+            var issues = await validator.ValidateAsync(target, ct);
+            return Results.Ok(new
+            {
+                versionNumber = target.VersionNumber,
+                status = target.Status.ToString(),
+                isValid = issues.All(i => i.Severity != ContentValidator.Error),
+                errorCount = issues.Count(i => i.Severity == ContentValidator.Error),
+                warningCount = issues.Count(i => i.Severity == ContentValidator.Warning),
+                issues
+            });
+        });
+
         // --- Yayın döngüsü ---
         group.MapPost("/{id:guid}/publish", async (Guid id, PublishRequest? req, ClaimsPrincipal user,
-            CmsDbContext db, CancellationToken ct) =>
+            CmsDbContext db, ContentValidator validator, CancellationToken ct) =>
         {
             var page = await LoadPageAsync(db, id, ct);
             if (page is null) return PageNotFound(id);
@@ -226,6 +252,16 @@ public static class PageEndpoints
                 return Problem("Yayınlanacak taslak yok — sayfa zaten güncel.", StatusCodes.Status409Conflict, "page.no_draft");
             if (draft.Components.Count == 0)
                 return Problem("Boş taslak yayınlanamaz; en az bir bileşen ekleyin.", StatusCodes.Status400BadRequest, "page.empty_draft");
+
+            // Kırık referansla yayına çıkılmasın (mağaza verisine ulaşılamazsa yalnızca uyarı üretilir → engellemez).
+            var issues = await validator.ValidateAsync(draft, ct);
+            var errors = issues.Where(i => i.Severity == ContentValidator.Error).ToList();
+            if (errors.Count > 0)
+                return Results.Problem(
+                    detail: $"İçerikte {errors.Count} kırık referans var; düzeltmeden yayınlanamaz.",
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "page.validation_failed",
+                    extensions: new Dictionary<string, object?> { ["issues"] = errors });
 
             // Önceki yayın sürümü arşive alınır.
             foreach (var v in page.Versions.Where(v => v.Status == VersionStatus.Published))
@@ -239,6 +275,35 @@ public static class PageEndpoints
 
             await db.SaveChangesAsync(ct);
             return Results.Ok(await BuildDetailAsync(db, id, ct));
+        });
+
+        // --- Önizleme kanalı: yayınlanmamış taslağı test cihazında görmek için süreli anahtar ---
+        group.MapPost("/{id:guid}/preview-token", async (Guid id, ClaimsPrincipal user, ITenantContext tenant,
+            CmsDbContext db, IConfiguration config, CancellationToken ct, int? expiresInMinutes = null) =>
+        {
+            var page = await db.Pages.FirstOrDefaultAsync(p => p.Id == id, ct);
+            if (page is null) return PageNotFound(id);
+            if (tenant.TenantId is not { } tenantId)
+                return Problem("Mağaza kapsamı yok.", StatusCodes.Status401Unauthorized, "tenant.missing");
+
+            var minutes = Math.Clamp(expiresInMinutes ?? config.GetValue<int?>("Preview:DefaultExpiryMinutes") ?? 60, 5, 1440);
+            var token = new PreviewToken
+            {
+                TenantId = tenantId,
+                PageId = page.Id,
+                Token = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24)).ToLowerInvariant(),
+                ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(minutes),
+                CreatedBy = user.FindFirstValue("preferred_username") ?? user.FindFirstValue("sub")
+            };
+            db.PreviewTokens.Add(token);
+            await db.SaveChangesAsync(ct);
+
+            return Results.Ok(new
+            {
+                token = token.Token,
+                previewUrl = $"/api/preview/{token.Token}",
+                expiresAt = token.ExpiresAt
+            });
         });
 
         group.MapGet("/{id:guid}/versions", async (Guid id, CmsDbContext db, CancellationToken ct) =>

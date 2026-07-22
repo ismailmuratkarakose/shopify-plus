@@ -16,6 +16,8 @@ public class CmsDbContext : DbContext
     public DbSet<Page> Pages => Set<Page>();
     public DbSet<PageVersion> PageVersions => Set<PageVersion>();
     public DbSet<PageComponent> PageComponents => Set<PageComponent>();
+    public DbSet<PreviewToken> PreviewTokens => Set<PreviewToken>();
+    public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,6 +53,27 @@ public class CmsDbContext : DbContext
             // Ayarlar tip bazlı değiştiği için jsonb: şemasız saklanır, uygulamada doğrulanır.
             e.Property(x => x.SettingsJson).HasColumnType("jsonb").IsRequired();
             e.HasIndex(x => new { x.PageVersionId, x.Position });
+        });
+
+        modelBuilder.Entity<PreviewToken>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Token).HasMaxLength(64).IsRequired();
+            e.Property(x => x.CreatedBy).HasMaxLength(200);
+            e.HasIndex(x => x.Token).IsUnique();
+            e.HasIndex(x => x.PageId);
+            // NOT: önizleme ucu anonimdir; kiracıyı anahtarın kendisi belirler → burada tenant filtresi YOK.
+        });
+
+        modelBuilder.Entity<MediaAsset>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.FileName).HasMaxLength(300).IsRequired();
+            e.Property(x => x.ContentType).HasMaxLength(100).IsRequired();
+            e.Property(x => x.StoragePath).HasMaxLength(500).IsRequired();
+            e.Property(x => x.UploadedBy).HasMaxLength(200);
+            e.HasIndex(x => new { x.TenantId, x.CreatedAt });
+            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
         });
 
         base.OnModelCreating(modelBuilder);

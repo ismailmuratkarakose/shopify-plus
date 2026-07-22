@@ -74,6 +74,10 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__CmsDb: "Host=postgres;Port=5432;Database=cms;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
       Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
+      Services__ShopifySync: "http://shopifysync:8080"
+      Media__LocalRoot: "/app/media"
+    volumes:
+      - ./.data/cms-media:/app/media
     ports:
       - "8090:8080"
     depends_on:
