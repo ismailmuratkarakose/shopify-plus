@@ -148,8 +148,17 @@ Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
 - Migration'lar: CmsExperienceAndFlags, InitialMobile. Doğrulandı (smokeG): yayın→snapshot(v4)→bayrak(v5)
   →mobil ekran→304 önbellek→katalog/arama/filtre→detay→koleksiyon→favori→checkout URL→yeni yayın(v6)
   mobilde göründü.
-- **İleriye bırakılan:** Shopify müşteri hesabı ile giriş/kayıt (gerçek Shopify app gerektirir; görev
-  listesinde D-10).
+- **AÇIK KALEM → D-10 · Müşteri kimliği ve oturum (3 → 6 adam-gün, revize 2026-07-23):**
+  Mobil uygulamanın son kullanıcıları **bizim Keycloak'ımızda değil, Shopify müşteri altyapısında** olur
+  (üye kayıt, giriş, şifre sıfırlama, profil, adres, sipariş geçmişi, misafir senaryosu). Müşteri zaten
+  web mağazasında Shopify hesabına sahiptir; kimliği kopyalamak sipariş geçmişini böler.
+  **Bağımlılık:** gerçek Shopify uygulaması kurulmadan yapılamaz (bkz. A-08).
+  **Çözülmesi gereken mimari karar (efor artışının sebebi):** bugün mobil uçlar kiracıyı JWT'deki
+  `tenant_id` claim'inden çözüyor; gerçek müşteride böyle bir token olmayacak. Netleşmesi gerekenler:
+  - mağaza (tenant) kimliği nereden gelecek → uygulamaya gömülü **mağaza API anahtarı / app identifier**,
+  - müşteri kimliği nereden → **Shopify customer access token** doğrulanıp `UserRef`'e eşlenecek,
+  - misafir kullanıcı nasıl çalışacak → favoriler/son gezilenler cihaz bazlı mı tutulacak.
+  Geliştirme sırasında müşteri yerine geçici olarak Keycloak demo kullanıcısının token'ı kullanılmaktadır.
 
 ### Faz D — kapsam notları (özgün plan)
 - Mobilin **app-güncellemesiz** çektiği sürümlü config: sayfa düzenleri, banner, kampanya, tema,
@@ -179,9 +188,31 @@ Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
 - 6 dil (TR/EN/DE/FR/IT/ES). Dil paketleri, uygulama metinleri yönetimi, dil aktif/pasif.
 - İçerikler Shopify dil yapılarına bağlı görüntülenir.
 
-### Faz J — Rol & yetkilendirme
-- Roller: **İçerik Editörü / Yayın Yöneticisi / Yönetici** (Keycloak realm rolleri + izinler).
+### Faz J — Kimlik, Üyelik & Yetkilendirme
+> Kapsam genişletildi (2026-07-23): yalnızca roller değil, **panel tarafının kimlik/üyelik akışlarının tamamı**.
+> Gerekçe: mevcut durumda Keycloak realm'inde 3 elle tanımlı demo kullanıcı var; self-service kayıt,
+> şifre sıfırlama ve e-posta doğrulama kapalı; mağazayı platform yöneticisi elle açıyor; kimlik doğrulama
+> geliştirme amaçlı **password grant** ile yapılıyor. Bunlar canlıya çıkamaz.
+
+**J-01…J-06 — Roller ve yetkilendirme (13,5 adam-gün, mevcut plan):**
+- Roller: **İçerik Editörü / Yayın Yöneticisi / Yönetici** (Keycloak realm rolleri + izin matrisi).
+- Kullanıcı yönetim uçları (davet, rol atama, pasifleştirme), denetim kaydı.
 - Hazırlama ↔ yayınlama ayrımı (Faz C içerik döngüsüyle hizalı).
+
+**J-07…J-10 — Üyelik ve kimlik akışları (+15 adam-gün, plana yeni eklendi):**
+- **J-07 · Mağaza self-service kaydı ve sağlama (provisioning) — 5 gün.** Kayıt formu API'si →
+  Keycloak Admin API ile kullanıcı + `tenant_id` claim üretimi → Merchant (mağaza) kaydı →
+  ilk girişte Shopify bağlama akışına yönlendirme. Bugün bu adım elle yapılıyor.
+- **J-08 · Üretim kimlik akışı (Authorization Code + PKCE) — 4 gün.** Panel ve mobil için standart
+  yetkilendirme kodu akışı, refresh token yönetimi, oturum sonlandırma; **password grant'in kaldırılması**
+  (şu anki kullanım yalnızca geliştirme içindir).
+- **J-09 · Şifre sıfırlama, e-posta doğrulama, SMTP — 3 gün.** Keycloak'ta ilgili akışların açılması,
+  e-posta sağlayıcı yapılandırması, çoklu dil e-posta şablonları.
+- **J-10 · Keycloak üretim sertleştirmesi — 3 gün.** Token ömürleri, brute-force koruması, ortam bazlı
+  client secret yönetimi, realm tanımının sürümlenmesi/otomasyonu.
+
+> **Faz J toplamı: 13,5 + 15 = 28,5 adam-gün.** (Görev listesi Excel'i bu genişletmeden önce üretildiği için
+> orada Faz J 13,5 gün görünür; müşteriye güncel rakam verilirken bu fark dikkate alınmalıdır.)
 
 ### Faz K — Analitik & ölçümleme
 - Firebase Analytics + GA4 event modeli, ingestion; e-ticaret/kampanya/dönüşüm/davranış raporları.
