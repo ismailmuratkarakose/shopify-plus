@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Marketplace.BuildingBlocks.MultiTenancy;
+using Marketplace.BuildingBlocks.Web;
 using Marketplace.Cms.Api.Domain;
 using Marketplace.Cms.Api.Infrastructure;
 using Marketplace.Cms.Api.Storage;
@@ -62,7 +63,7 @@ public static class MediaEndpoints
             await db.SaveChangesAsync(ct);
 
             return Results.Created($"/api/media/{asset.Id}", ToDto(asset));
-        }).RequireAuthorization().DisableAntiforgery();
+        }).RequireAuthorization(Policies.ContentEdit).DisableAntiforgery();
 
         group.MapGet("/", async (CmsDbContext db, CancellationToken ct) =>
         {
@@ -91,7 +92,7 @@ public static class MediaEndpoints
             db.MediaAssets.Remove(asset);
             await db.SaveChangesAsync(ct);
             return Results.NoContent();
-        }).RequireAuthorization();
+        }).RequireAuthorization(Policies.ContentEdit);
 
         return app;
     }

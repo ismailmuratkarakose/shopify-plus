@@ -46,10 +46,8 @@ builder.Services.AddMassTransit(x =>
 });
 builder.Services.AddOutboxDispatcher<MerchantDbContext>();
 
-// --- Kimlik doğrulama + yetkilendirme ---
+// --- Kimlik doğrulama + yetkilendirme (izin matrisi ortak yapı taşında tanımlı) ---
 builder.Services.AddKeycloakJwtAuth(builder.Configuration, builder.Environment);
-builder.Services.AddAuthorizationBuilder()
-    .AddPolicy("owner", p => p.RequireRole("owner", "platform-admin"));
 
 // --- Health checks ---
 builder.Services.AddHealthChecks()

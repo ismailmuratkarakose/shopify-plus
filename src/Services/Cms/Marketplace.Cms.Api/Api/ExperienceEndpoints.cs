@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Marketplace.BuildingBlocks.Web;
 using Marketplace.Cms.Api.Domain;
 using Marketplace.Cms.Api.Experience;
 using Marketplace.Cms.Api.Infrastructure;
@@ -20,6 +21,8 @@ public static class ExperienceEndpoints
     {
         // --- Özellik bayrakları ---
         var flags = app.MapGroup("/api/flags").RequireAuthorization().WithTags("FeatureFlags");
+        // Bayrak değişikliği canlı davranışı etkiler → yayın yetkisi gerekir.
+        var flagWrite = app.MapGroup("/api/flags").RequireAuthorization(Policies.ContentPublish).WithTags("FeatureFlags");
 
         flags.MapGet("/", async (CmsDbContext db, CancellationToken ct) =>
         {
@@ -27,7 +30,7 @@ public static class ExperienceEndpoints
             return Results.Ok(items.Select(f => new FeatureFlagDto(f.Key, f.IsEnabled, f.Value, f.Description, f.UpdatedAt)));
         });
 
-        flags.MapPut("/{key}", async (string key, UpsertFlagRequest req, ClaimsPrincipal user,
+        flagWrite.MapPut("/{key}", async (string key, UpsertFlagRequest req, ClaimsPrincipal user,
             CmsDbContext db, SnapshotBuilder snapshots, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(key))
@@ -56,7 +59,7 @@ public static class ExperienceEndpoints
             });
         });
 
-        flags.MapDelete("/{key}", async (string key, ClaimsPrincipal user, CmsDbContext db,
+        flagWrite.MapDelete("/{key}", async (string key, ClaimsPrincipal user, CmsDbContext db,
             SnapshotBuilder snapshots, CancellationToken ct) =>
         {
             var flag = await db.FeatureFlags.FirstOrDefaultAsync(f => f.Key == key, ct);
@@ -69,6 +72,7 @@ public static class ExperienceEndpoints
 
         // --- Deneyim anlık görüntüsü ---
         var experience = app.MapGroup("/api/experience").RequireAuthorization().WithTags("Experience");
+        var experienceWrite = app.MapGroup("/api/experience").RequireAuthorization(Policies.ContentPublish).WithTags("Experience");
 
         experience.MapGet("/current", async (HttpContext http, CmsDbContext db, CancellationToken ct) =>
         {
@@ -94,7 +98,7 @@ public static class ExperienceEndpoints
             return Results.Ok(items);
         });
 
-        experience.MapPost("/rebuild", async (ClaimsPrincipal user, SnapshotBuilder snapshots, CancellationToken ct) =>
+        experienceWrite.MapPost("/rebuild", async (ClaimsPrincipal user, SnapshotBuilder snapshots, CancellationToken ct) =>
         {
             var snap = await snapshots.RebuildAsync("manual",
                 user.FindFirstValue("preferred_username") ?? user.FindFirstValue("sub"), ct);

@@ -15,6 +15,18 @@
       {
         "name": "merchant",
         "description": "Merchant kullanıcısı"
+      },
+      {
+        "name": "store-admin",
+        "description": "Mağaza yöneticisi: mağaza ayarları, kullanıcı yönetimi ve tüm içerik işlemleri"
+      },
+      {
+        "name": "publish-manager",
+        "description": "Yayın yöneticisi: içeriği onaylar, yayınlar, sürüm yönetir"
+      },
+      {
+        "name": "content-editor",
+        "description": "İçerik editörü: içerik hazırlar ve düzenler; yayınlayamaz"
       }
     ]
   },
@@ -113,6 +125,54 @@
       "attributes": {
         "tenant_id": [
           "22222222-2222-2222-2222-222222222222"
+        ]
+      }
+    },
+    {
+      "username": "demo-editor",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "demo-editor@demo.local",
+      "firstName": "Demo",
+      "lastName": "Editor",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "content-editor"
+      ],
+      "attributes": {
+        "tenant_id": [
+          "11111111-1111-1111-1111-111111111111"
+        ]
+      }
+    },
+    {
+      "username": "demo-publisher",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "demo-publisher@demo.local",
+      "firstName": "Demo",
+      "lastName": "Publisher",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "publish-manager"
+      ],
+      "attributes": {
+        "tenant_id": [
+          "11111111-1111-1111-1111-111111111111"
         ]
       }
     }

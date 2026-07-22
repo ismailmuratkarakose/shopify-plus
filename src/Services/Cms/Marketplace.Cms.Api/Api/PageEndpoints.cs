@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Marketplace.BuildingBlocks.MultiTenancy;
+using Marketplace.BuildingBlocks.Web;
 using Marketplace.Cms.Api.Components;
 using Marketplace.Cms.Api.Domain;
 using Marketplace.Cms.Api.Experience;
@@ -37,7 +38,10 @@ public static class PageEndpoints
 {
     public static IEndpointRouteBuilder MapPageEndpoints(this IEndpointRouteBuilder app)
     {
+        // Okuma herkese (kimlik doğrulanmış), hazırlama içerik editörüne, canlıya alma yayın yöneticisine.
         var group = app.MapGroup("/api/pages").RequireAuthorization().WithTags("Pages");
+        var edit = app.MapGroup("/api/pages").RequireAuthorization(Policies.ContentEdit).WithTags("Pages");
+        var publish = app.MapGroup("/api/pages").RequireAuthorization(Policies.ContentPublish).WithTags("Pages");
 
         // Tasarımcı paleti: desteklenen bileşen tipleri ve ayar şemaları.
         group.MapGet("/component-types", () => Results.Ok(ComponentTypes.All.Values.Select(d => new
@@ -50,7 +54,7 @@ public static class PageEndpoints
         })));
 
         // --- Sayfa CRUD ---
-        group.MapPost("/", async (CreatePageRequest req, CmsDbContext db, CancellationToken ct) =>
+        edit.MapPost("/", async (CreatePageRequest req, CmsDbContext db, CancellationToken ct) =>
         {
             if (!Enum.TryParse<ScreenType>(req.ScreenType, true, out var screen))
                 return Problem($"Geçersiz ekran tipi: '{req.ScreenType}'. Geçerli: {string.Join(", ", Enum.GetNames<ScreenType>())}",
@@ -109,7 +113,7 @@ public static class PageEndpoints
                 : Results.Ok(ToVersionDto(published));
         });
 
-        group.MapPut("/{id:guid}", async (Guid id, UpdatePageRequest req, CmsDbContext db, CancellationToken ct) =>
+        edit.MapPut("/{id:guid}", async (Guid id, UpdatePageRequest req, CmsDbContext db, CancellationToken ct) =>
         {
             var page = await db.Pages.FirstOrDefaultAsync(p => p.Id == id, ct);
             if (page is null) return PageNotFound(id);
@@ -119,7 +123,7 @@ public static class PageEndpoints
             return Results.Ok(await BuildDetailAsync(db, id, ct));
         });
 
-        group.MapDelete("/{id:guid}", async (Guid id, CmsDbContext db, CancellationToken ct) =>
+        edit.MapDelete("/{id:guid}", async (Guid id, CmsDbContext db, CancellationToken ct) =>
         {
             var page = await db.Pages.FirstOrDefaultAsync(p => p.Id == id, ct);
             if (page is null) return PageNotFound(id);
@@ -129,7 +133,7 @@ public static class PageEndpoints
         });
 
         // --- Bileşen yerleşimi (her zaman TASLAK üzerinde) ---
-        group.MapPost("/{id:guid}/components", async (Guid id, AddComponentRequest req, CmsDbContext db, CancellationToken ct) =>
+        edit.MapPost("/{id:guid}/components", async (Guid id, AddComponentRequest req, CmsDbContext db, CancellationToken ct) =>
         {
             var page = await LoadPageAsync(db, id, ct);
             if (page is null) return PageNotFound(id);
@@ -162,7 +166,7 @@ public static class PageEndpoints
             return Results.Ok(await BuildDetailAsync(db, id, ct));
         });
 
-        group.MapPut("/{id:guid}/components/{componentId:guid}", async (
+        edit.MapPut("/{id:guid}/components/{componentId:guid}", async (
             Guid id, Guid componentId, UpdateComponentRequest req, CmsDbContext db, CancellationToken ct) =>
         {
             var page = await LoadPageAsync(db, id, ct);
@@ -186,7 +190,7 @@ public static class PageEndpoints
             return Results.Ok(await BuildDetailAsync(db, id, ct));
         });
 
-        group.MapDelete("/{id:guid}/components/{componentId:guid}", async (
+        edit.MapDelete("/{id:guid}/components/{componentId:guid}", async (
             Guid id, Guid componentId, CmsDbContext db, CancellationToken ct) =>
         {
             var page = await LoadPageAsync(db, id, ct);
@@ -205,7 +209,7 @@ public static class PageEndpoints
         });
 
         // Sürükle-bırak sıralaması: bileşen kimlikleri istenen sırada gönderilir.
-        group.MapPut("/{id:guid}/components/order", async (Guid id, ReorderRequest req, CmsDbContext db, CancellationToken ct) =>
+        edit.MapPut("/{id:guid}/components/order", async (Guid id, ReorderRequest req, CmsDbContext db, CancellationToken ct) =>
         {
             var page = await LoadPageAsync(db, id, ct);
             if (page is null) return PageNotFound(id);
@@ -248,7 +252,7 @@ public static class PageEndpoints
         });
 
         // --- Yayın döngüsü ---
-        group.MapPost("/{id:guid}/publish", async (Guid id, PublishRequest? req, ClaimsPrincipal user,
+        publish.MapPost("/{id:guid}/publish", async (Guid id, PublishRequest? req, ClaimsPrincipal user,
             CmsDbContext db, ContentValidator validator, SnapshotBuilder snapshots, CancellationToken ct) =>
         {
             var page = await LoadPageAsync(db, id, ct);
@@ -290,7 +294,7 @@ public static class PageEndpoints
         });
 
         // --- Önizleme kanalı: yayınlanmamış taslağı test cihazında görmek için süreli anahtar ---
-        group.MapPost("/{id:guid}/preview-token", async (Guid id, ClaimsPrincipal user, ITenantContext tenant,
+        edit.MapPost("/{id:guid}/preview-token", async (Guid id, ClaimsPrincipal user, ITenantContext tenant,
             CmsDbContext db, IConfiguration config, CancellationToken ct, int? expiresInMinutes = null) =>
         {
             var page = await db.Pages.FirstOrDefaultAsync(p => p.Id == id, ct);
@@ -329,7 +333,7 @@ public static class PageEndpoints
         });
 
         // Geri alma: seçilen sürümün içeriği yeni bir taslağa kopyalanır (yayın etkilenmez).
-        group.MapPost("/{id:guid}/versions/{versionId:guid}/restore", async (
+        publish.MapPost("/{id:guid}/versions/{versionId:guid}/restore", async (
             Guid id, Guid versionId, CmsDbContext db, CancellationToken ct) =>
         {
             var page = await LoadPageAsync(db, id, ct);

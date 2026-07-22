@@ -54,7 +54,8 @@ public static class KeycloakAuthExtensions
                 };
             });
 
-        services.AddAuthorization();
+        // Ortak izin matrisi (roller → policy'ler) tüm servislerde aynı sözlükle kurulur.
+        services.AddMarketplacePolicies();
         return services;
     }
 }

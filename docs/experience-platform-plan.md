@@ -194,10 +194,18 @@ Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
 > şifre sıfırlama ve e-posta doğrulama kapalı; mağazayı platform yöneticisi elle açıyor; kimlik doğrulama
 > geliştirme amaçlı **password grant** ile yapılıyor. Bunlar canlıya çıkamaz.
 
-**J-01…J-06 — Roller ve yetkilendirme (13,5 adam-gün, mevcut plan):**
-- Roller: **İçerik Editörü / Yayın Yöneticisi / Yönetici** (Keycloak realm rolleri + izin matrisi).
-- Kullanıcı yönetim uçları (davet, rol atama, pasifleştirme), denetim kaydı.
-- Hazırlama ↔ yayınlama ayrımı (Faz C içerik döngüsüyle hizalı).
+**J-01…J-06 — Roller ve yetkilendirme (13,5 adam-gün):**
+- **J-01, J-02, J-04 ✅ (2026-07-23) — roller, izin matrisi, hazırlama↔yayınlama ayrımı:**
+  Ortak yapı taşında merkezî sözlük (`Roles` / `Policies` / `AddMarketplacePolicies`), `AddKeycloakJwtAuth`
+  içinden tüm servislere kurulur. Roller: `content-editor` ⊂ `publish-manager` ⊂ `store-admin`
+  (eski `merchant` rolü buna eşdeğer) ⊂ `owner`/`platform-admin`. Politikalar: `content.edit`
+  (sayfa/bileşen/medya hazırlama), `content.publish` (yayınlama, geri alma, bayrak değişimi,
+  snapshot rebuild), `store.manage`, `owner` (mağaza açma). CMS uçları okuma/düzenleme/yayınlama
+  olarak üç ayrı gruba bölündü. Realm'e roller + `demo-editor`, `demo-publisher` kullanıcıları eklendi.
+  Doğrulandı (smokeH): editör hazırlar ve medya yükler ama **publish/bayrak/rebuild → 403**;
+  yayın yöneticisi yayınlar ve düzenler; mağaza açma yalnızca owner (editör 403, owner 201).
+- **Kalan:** J-03 kullanıcı yönetim uçları (davet, rol atama, pasifleştirme — Keycloak Admin API),
+  J-05 denetim kaydı (audit log), J-06 testler.
 
 **J-07…J-10 — Üyelik ve kimlik akışları (+15 adam-gün, plana yeni eklendi):**
 - **J-07 · Mağaza self-service kaydı ve sağlama (provisioning) — 5 gün.** Kayıt formu API'si →
