@@ -32,6 +32,13 @@ public record ShopifyCustomerData(
     long CustomerId, string? Email, string? FirstName, string? LastName, string? Phone,
     int OrdersCount, decimal TotalSpent, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 
+public record ShopifyDiscountData(
+    long DiscountId, string Title, string Code, string DiscountType, decimal Value, string? Currency,
+    DateTimeOffset StartsAt, DateTimeOffset? EndsAt, string Status, int UsageCount);
+
+public record ShopifyPageData(
+    long PageId, string Title, string Handle, string? BodyHtml, string Status, DateTimeOffset UpdatedAt);
+
 /// <summary>
 /// Shopify Admin API soyutlaması. Transport (GraphQL/REST/simulator) implementasyonlarda gizlenir.
 /// Config `Shopify:ClientMode` ile seçilir.
@@ -56,4 +63,10 @@ public interface IShopifyClient
 
     /// <summary>Mağazanın müşterilerini çeker (segmentasyon/kişiselleştirme için).</summary>
     Task<IReadOnlyList<ShopifyCustomerData>> GetCustomersAsync(ShopifyStoreCredentials store, CancellationToken ct);
+
+    /// <summary>Mağazanın indirim/kampanyalarını çeker (kampanya alanlarına bağlamak için).</summary>
+    Task<IReadOnlyList<ShopifyDiscountData>> GetDiscountsAsync(ShopifyStoreCredentials store, CancellationToken ct);
+
+    /// <summary>Mağazanın içerik sayfalarını çeker (mobil içerik ekranlarında kullanılır).</summary>
+    Task<IReadOnlyList<ShopifyPageData>> GetPagesAsync(ShopifyStoreCredentials store, CancellationToken ct);
 }

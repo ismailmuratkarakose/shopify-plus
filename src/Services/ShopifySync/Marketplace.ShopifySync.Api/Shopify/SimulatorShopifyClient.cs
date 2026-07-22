@@ -112,4 +112,37 @@ public sealed class SimulatorShopifyClient : IShopifyClient
         _logger.LogInformation("[SIMULATOR] {Store} için {Count} sipariş üretildi.", store.ShopDomain, orders.Count);
         return orders;
     }
+
+    public Task<IReadOnlyList<ShopifyDiscountData>> GetDiscountsAsync(ShopifyStoreCredentials store, CancellationToken ct)
+    {
+        var defs = new[]
+        {
+            ("Hoş Geldin İndirimi", "HOSGELDIN10", "percentage", 10m, (string?)null, 25),
+            ("Yaz Kampanyası", "YAZ2026", "percentage", 20m, (string?)null, 132),
+            ("Kargo Bedava", "KARGOBEDAVA", "fixed_amount", 49.90m, "TRY", 64)
+        };
+        var now = DateTimeOffset.UtcNow;
+        var list = defs.Select((d, i) => new ShopifyDiscountData(
+            DeterministicId(store.ShopDomain, $"D{i}"), d.Item1, d.Item2, d.Item3, d.Item4, d.Item5,
+            now.AddDays(-30 + i * 5), i == 2 ? null : now.AddDays(30 + i * 10),
+            i == 0 ? "active" : (i == 1 ? "active" : "expired"), d.Item6)).ToList();
+        _logger.LogInformation("[SIMULATOR] {Store} için {Count} indirim üretildi.", store.ShopDomain, list.Count);
+        return Task.FromResult<IReadOnlyList<ShopifyDiscountData>>(list);
+    }
+
+    public Task<IReadOnlyList<ShopifyPageData>> GetPagesAsync(ShopifyStoreCredentials store, CancellationToken ct)
+    {
+        var defs = new[]
+        {
+            ("Hakkımızda", "hakkimizda", "<p>Mağazamız hakkında bilgi.</p>"),
+            ("İade ve Değişim", "iade-degisim", "<p>İade koşulları ve süreçler.</p>"),
+            ("Gizlilik Politikası", "gizlilik-politikasi", "<p>Kişisel verilerin korunması.</p>"),
+            ("İletişim", "iletisim", "<p>Bize ulaşın.</p>")
+        };
+        var list = defs.Select((d, i) => new ShopifyPageData(
+            DeterministicId(store.ShopDomain, $"PG{i}"), d.Item1, d.Item2, d.Item3, "published",
+            DateTimeOffset.UtcNow.AddDays(-i * 3))).ToList();
+        _logger.LogInformation("[SIMULATOR] {Store} için {Count} sayfa üretildi.", store.ShopDomain, list.Count);
+        return Task.FromResult<IReadOnlyList<ShopifyPageData>>(list);
+    }
 }

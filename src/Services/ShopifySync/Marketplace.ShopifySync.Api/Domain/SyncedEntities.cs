@@ -84,6 +84,52 @@ public class SyncedOrderLine
     public decimal Price { get; set; }
 }
 
+/// <summary>Shopify indirimi/kampanyası (read-model) — kampanya alanlarına bağlanır.</summary>
+public class SyncedDiscount : AuditableTenantEntity
+{
+    public long ShopifyDiscountId { get; set; }
+    public string Title { get; set; } = default!;
+    public string Code { get; set; } = default!;
+    public string DiscountType { get; set; } = default!;   // percentage / fixed_amount
+    public decimal Value { get; set; }
+    public string? Currency { get; set; }
+    public DateTimeOffset StartsAt { get; set; }
+    public DateTimeOffset? EndsAt { get; set; }
+    public string Status { get; set; } = default!;          // active / expired / scheduled
+    public int UsageCount { get; set; }
+}
+
+/// <summary>Shopify içerik sayfası (read-model) — mobil içerik ekranlarında gösterilir.</summary>
+public class SyncedPage : AuditableTenantEntity
+{
+    public long ShopifyPageId { get; set; }
+    public string Title { get; set; } = default!;
+    public string Handle { get; set; } = default!;
+    public string? BodyHtml { get; set; }
+    public string Status { get; set; } = default!;
+    public DateTimeOffset ShopifyUpdatedAt { get; set; }
+}
+
+/// <summary>
+/// Mağaza başına senkron durumu: son çalışma zamanı, sonuç sayıları ve varsa hata.
+/// Yönetim panelinde "veriler ne kadar güncel" sorusunu yanıtlar.
+/// </summary>
+public class StoreSyncState : AuditableTenantEntity
+{
+    public DateTimeOffset? LastSyncAt { get; set; }
+    public string LastStatus { get; set; } = "never";       // success / failed / never
+    public string? LastError { get; set; }
+    public long DurationMs { get; set; }
+    public int ProductCount { get; set; }
+    public int CollectionCount { get; set; }
+    public int OrderCount { get; set; }
+    public int CustomerCount { get; set; }
+    public int DiscountCount { get; set; }
+    public int PageCount { get; set; }
+    /// <summary>Senkronu tetikleyen: manual / reconciliation</summary>
+    public string LastTrigger { get; set; } = "manual";
+}
+
 /// <summary>Shopify müşterisi (read-model) — segmentasyon ve kişiselleştirme için.</summary>
 public class SyncedCustomer : AuditableTenantEntity
 {

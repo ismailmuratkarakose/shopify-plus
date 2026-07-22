@@ -11,6 +11,8 @@ public record SyncedCollectionDto(long CollectionId, string Title, string Handle
 public record SyncedOrderLineDto(long ProductId, long VariantId, string? Sku, string Title, int Quantity, decimal Price);
 public record SyncedOrderDto(long OrderId, string Name, long? CustomerId, string? Email, string FinancialStatus, string? FulfillmentStatus, decimal TotalPrice, string Currency, DateTimeOffset CreatedAt, IReadOnlyList<SyncedOrderLineDto> Lines);
 public record SyncedCustomerDto(long CustomerId, string? Email, string? FirstName, string? LastName, string? Phone, int OrdersCount, decimal TotalSpent);
+public record SyncedDiscountDto(long DiscountId, string Title, string Code, string DiscountType, decimal Value, string? Currency, DateTimeOffset StartsAt, DateTimeOffset? EndsAt, string Status, int UsageCount);
+public record SyncedPageDto(long PageId, string Title, string Handle, string? BodyHtml, string Status, DateTimeOffset UpdatedAt);
 
 /// <summary>
 /// Store Data uçları: Shopify'dan senkronlanan ürün/koleksiyon read-model'ini okur ve senkronu tetikler.
@@ -29,8 +31,18 @@ public static class StoreDataEndpoints
                 return Results.Problem("Mağaza kapsamı yok.", statusCode: StatusCodes.Status401Unauthorized, title: "tenant.missing");
             try
             {
-                var (products, collections, orders, customers) = await sync.SyncAsync(merchantId, ct);
-                return Results.Ok(new { synced = true, products, collections, orders, customers });
+                var r = await sync.SyncAsync(merchantId, "manual", ct);
+                return Results.Ok(new
+                {
+                    synced = true,
+                    products = r.Products,
+                    collections = r.Collections,
+                    orders = r.Orders,
+                    customers = r.Customers,
+                    discounts = r.Discounts,
+                    pages = r.Pages,
+                    durationMs = r.DurationMs
+                });
             }
             catch (InvalidOperationException ex)
             {
@@ -107,6 +119,59 @@ public static class StoreDataEndpoints
                 .Skip((p - 1) * size).Take(size).ToListAsync(ct);
             return Results.Ok(items.Select(c => new SyncedCustomerDto(
                 c.ShopifyCustomerId, c.Email, c.FirstName, c.LastName, c.Phone, c.OrdersCount, c.TotalSpent)));
+        });
+
+        // İndirimler / kampanyalar (kampanya alanlarına bağlanmak üzere).
+        group.MapGet("/discounts", async (ShopifySyncDbContext db, CancellationToken ct, string? status = null) =>
+        {
+            var q = db.SyncedDiscounts.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(status)) q = q.Where(d => d.Status == status);
+            var items = await q.OrderByDescending(d => d.StartsAt).ToListAsync(ct);
+            return Results.Ok(items.Select(d => new SyncedDiscountDto(
+                d.ShopifyDiscountId, d.Title, d.Code, d.DiscountType, d.Value, d.Currency,
+                d.StartsAt, d.EndsAt, d.Status, d.UsageCount)));
+        });
+
+        // Mağaza içerik sayfaları.
+        group.MapGet("/pages", async (ShopifySyncDbContext db, CancellationToken ct) =>
+        {
+            var items = await db.SyncedPages.OrderBy(p => p.Title).ToListAsync(ct);
+            return Results.Ok(items.Select(p => new SyncedPageDto(
+                p.ShopifyPageId, p.Title, p.Handle, p.BodyHtml, p.Status, p.ShopifyUpdatedAt)));
+        });
+
+        group.MapGet("/pages/{handle}", async (string handle, ShopifySyncDbContext db, CancellationToken ct) =>
+        {
+            var p = await db.SyncedPages.FirstOrDefaultAsync(x => x.Handle == handle, ct);
+            return p is null
+                ? Results.Problem($"Sayfa bulunamadı: {handle}", statusCode: StatusCodes.Status404NotFound, title: "page.not_found")
+                : Results.Ok(new SyncedPageDto(p.ShopifyPageId, p.Title, p.Handle, p.BodyHtml, p.Status, p.ShopifyUpdatedAt));
+        });
+
+        // Senkron durumu: veriler ne kadar güncel, son çalışma sonucu ne?
+        group.MapGet("/sync/status", async (ShopifySyncDbContext db, CancellationToken ct) =>
+        {
+            var s = await db.SyncStates.FirstOrDefaultAsync(ct);
+            if (s is null)
+                return Results.Ok(new { lastStatus = "never", message = "Bu mağaza için henüz senkron çalıştırılmadı." });
+
+            return Results.Ok(new
+            {
+                lastStatus = s.LastStatus,
+                lastSyncAt = s.LastSyncAt,
+                lastTrigger = s.LastTrigger,
+                durationMs = s.DurationMs,
+                lastError = s.LastError,
+                counts = new
+                {
+                    products = s.ProductCount,
+                    collections = s.CollectionCount,
+                    orders = s.OrderCount,
+                    customers = s.CustomerCount,
+                    discounts = s.DiscountCount,
+                    pages = s.PageCount
+                }
+            });
         });
 
         return app;

@@ -82,6 +82,10 @@ services:
       Secrets__EncryptionKey: ${MERCHANT_ENCRYPTION_KEY:-MDEyMzQ1Njc4OUFCQ0RFRjAxMjM0NTY3ODlBQkNERUY=}
       Shopify__ClientMode: ${SHOPIFY_CLIENT_MODE:-simulator}
       Shopify__WebhookSecret: ${SHOPIFY_WEBHOOK_SECRET:-dev-shopify-webhook-secret}
+      # Lokal geliştirmede mutabakat kısa aralıkla çalışır (prod varsayılanı 60 dk).
+      Sync__Reconciliation__Enabled: ${SYNC_RECONCILIATION_ENABLED:-true}
+      Sync__Reconciliation__IntervalMinutes: ${SYNC_RECONCILIATION_INTERVAL_MIN:-1}
+      Sync__Reconciliation__InitialDelaySeconds: ${SYNC_RECONCILIATION_INITIAL_DELAY_SEC:-20}
     ports:
       - "8086:8080"
     depends_on:

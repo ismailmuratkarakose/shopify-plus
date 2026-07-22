@@ -33,6 +33,8 @@ builder.Services.AddHttpClient<IMerchantCredentialClient, MerchantCredentialClie
 
 builder.Services.AddScoped<ShopifyWebhookProcessor>();
 builder.Services.AddScoped<StoreSyncService>();
+// Periyodik mutabakat: kaçan webhook'lardan doğabilecek veri farklarını kapatır.
+builder.Services.AddHostedService<ReconciliationService>();
 
 // Shopify client + OAuth: config ile simulator / graphql seçilir.
 var clientMode = builder.Configuration["Shopify:ClientMode"] ?? "simulator";

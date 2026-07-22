@@ -64,9 +64,17 @@ Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
 - **Bilinen kenar durum:** `CreateMerchant` yalnızca slug benzersizliğini kontrol ediyor; var olan Id ile
   farklı isim → PK çakışması (500 yerine 409 olmalı). Ayrı görev.
 
-### Faz B — Shopify senkron genişletme (read-model)  🟡 (ürün+koleksiyon+sipariş+müşteri ✅)
-- Varlıklar: **ürün, varyant, koleksiyon, stok*, fiyat*, sipariş, müşteri** ✅ | kalan: **indirim, sayfa**
+### Faz B — Shopify senkron genişletme (read-model)  ✅ TAMAMLANDI
+- Varlıklar: **ürün, varyant, koleksiyon, stok*, fiyat*, sipariş, müşteri, indirim, sayfa** ✅
   (*stok/fiyat varyantta geliyor).
+- **Dilim 4 ✅ (2026-07-22) — indirim + sayfa + mutabakat:** `GetDiscountsAsync`/`GetPagesAsync`
+  (simulator 3 indirim / 4 sayfa); read-model `SyncedDiscount`, `SyncedPage`; uçlar
+  `GET /api/shopify/discounts` (`status` filtresi), `/pages`, `/pages/{handle}`.
+  **Senkron durumu:** `StoreSyncState` (son çalışma, tetikleyici, süre, sayaçlar, hata) +
+  `GET /api/shopify/sync/status`. **Periyodik mutabakat:** `ReconciliationService` (BackgroundService)
+  bağlı tüm mağazaları yapılandırılabilir aralıkla yeniden senkronlar
+  (`Sync:Reconciliation:{Enabled,IntervalMinutes,InitialDelaySeconds}`; prod 60 dk, compose'da dev 1 dk).
+  Migration: ShopifyDiscountsPagesSyncState. Doğrulandı (smokeD): 6 varlık senkronu + otomatik mutabakat.
 - **Dilim 3 ✅ (2026-07-22) — sipariş + müşteri:** `GetOrdersAsync`/`GetCustomersAsync` (simulator 4 sipariş/
   3 müşteri, ürünlere referanslı); read-model `SyncedOrder`(+`SyncedOrderLine`) ve `SyncedCustomer`;
   `StoreSyncService` full-refresh'e dahil; uçlar `GET /api/shopify/orders` (filtre: `customerId`,
@@ -78,9 +86,10 @@ Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
   Shopify'dan çek → full-refresh upsert); uçlar `POST /api/shopify/sync`, `GET /api/shopify/products`,
   `/products/{id}`, `/collections`. Migration: ShopifyReadModel. Doğrulandı (smokeB): sync → 5 ürün
   (varyant+sku+barkod+fiyat+stok) + 2 koleksiyon.
-- **Kalan dilimler:** webhook→read-model incremental (mevcut inbox/HMAC deseni) + periyodik reconciliation;
-  sipariş/müşteri/sayfa/indirim; rate-limit/backoff; ardından pazaryeri Catalog/Order/Inventory/Payment ARŞİVİ.
-- Çıktı: mağaza verisinin güncel read-model'i; CMS ve kişiselleştirme bunu okur.
+- **İleriye bırakılan (gerçek mağaza bağlanınca):** Shopify Admin GraphQL sorgularının gerçek implementasyonu
+  (şu an simulator ile çalışıyor, `IShopifyClient` arkasında), imleçli sayfalama/bulk import,
+  rate-limit + backoff. Bunlar Excel görev listesinde B-13/B-14/B-16 olarak ayrıca eforlandırılmıştır.
+- Çıktı: mağaza verisinin güncel read-model'i; CMS ve kişiselleştirme bunu okur. ✅
 
 ### Faz C — Deneyim/İçerik CMS çekirdeği (sürükle-bırak veri modeli)
 - **Ekran/Sayfa** modeli: Home, PLP, PDP, Cart, Campaign, Landing.
