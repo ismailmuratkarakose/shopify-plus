@@ -104,6 +104,12 @@ public sealed partial class GraphQlShopifyClient : IShopifyClient
     public Task<IReadOnlyList<ShopifyCollectionData>> GetCollectionsAsync(ShopifyStoreCredentials store, CancellationToken ct)
         => throw new NotImplementedException("GraphQL koleksiyon okuma Faz B'de simulator ile çalışıyor; gerçek sorgu ileride.");
 
+    public Task<IReadOnlyList<ShopifyOrderData>> GetOrdersAsync(ShopifyStoreCredentials store, CancellationToken ct)
+        => throw new NotImplementedException("GraphQL sipariş okuma Faz B'de simulator ile çalışıyor; gerçek sorgu ileride.");
+
+    public Task<IReadOnlyList<ShopifyCustomerData>> GetCustomersAsync(ShopifyStoreCredentials store, CancellationToken ct)
+        => throw new NotImplementedException("GraphQL müşteri okuma Faz B'de simulator ile çalışıyor; gerçek sorgu ileride.");
+
     [GeneratedRegex(@"gid://shopify/Product/(\d+)")]
     private static partial Regex ProductGidRegex();
 }

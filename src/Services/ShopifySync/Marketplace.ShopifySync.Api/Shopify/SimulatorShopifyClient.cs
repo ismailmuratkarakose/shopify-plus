@@ -70,4 +70,46 @@ public sealed class SimulatorShopifyClient : IShopifyClient
         };
         return collections;
     }
+
+    public Task<IReadOnlyList<ShopifyCustomerData>> GetCustomersAsync(ShopifyStoreCredentials store, CancellationToken ct)
+    {
+        var people = new[] { ("Ayşe", "Yılmaz"), ("Mehmet", "Demir"), ("Zeynep", "Kaya") };
+        var customers = people.Select((p, i) => new ShopifyCustomerData(
+            DeterministicId(store.ShopDomain, $"C{i}"),
+            $"{p.Item1.ToLowerInvariant()}@example.com", p.Item1, p.Item2, $"+9055500000{i:D2}",
+            OrdersCount: i + 1, TotalSpent: 250m + i * 175,
+            DateTimeOffset.UtcNow.AddMonths(-6 + i), DateTimeOffset.UtcNow.AddDays(-i)))
+            .ToList();
+        _logger.LogInformation("[SIMULATOR] {Store} için {Count} müşteri üretildi.", store.ShopDomain, customers.Count);
+        return Task.FromResult<IReadOnlyList<ShopifyCustomerData>>(customers);
+    }
+
+    public async Task<IReadOnlyList<ShopifyOrderData>> GetOrdersAsync(ShopifyStoreCredentials store, CancellationToken ct)
+    {
+        var products = await GetProductsAsync(store, ct);
+        var customers = await GetCustomersAsync(store, ct);
+        var statuses = new[] { ("paid", "fulfilled"), ("paid", (string?)null), ("pending", null), ("refunded", "fulfilled") };
+
+        var orders = new List<ShopifyOrderData>();
+        for (var i = 0; i < statuses.Length; i++)
+        {
+            var customer = customers[i % customers.Count];
+            var product = products[i % products.Count];
+            var variant = product.Variants[0];
+            var qty = 1 + (i % 3);
+            var line = new ShopifyOrderLineData(
+                DeterministicId(store.ShopDomain, $"L{i}"), product.ProductId, variant.VariantId,
+                variant.Sku, product.Title, qty, variant.Price);
+
+            orders.Add(new ShopifyOrderData(
+                DeterministicId(store.ShopDomain, $"O{i}"), $"#{1001 + i}",
+                customer.CustomerId, customer.Email,
+                statuses[i].Item1, statuses[i].Item2,
+                variant.Price * qty, "TRY",
+                DateTimeOffset.UtcNow.AddDays(-10 + i), DateTimeOffset.UtcNow.AddDays(-i),
+                new[] { line }));
+        }
+        _logger.LogInformation("[SIMULATOR] {Store} için {Count} sipariş üretildi.", store.ShopDomain, orders.Count);
+        return orders;
+    }
 }

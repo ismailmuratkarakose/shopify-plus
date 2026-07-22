@@ -58,14 +58,20 @@ Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
   Token Merchant'a **internal write** (`POST /internal/integrations/{id}/shopify`) ile kaydedilir →
   mevcut `MerchantIntegrationConfigured` pipeline'ı read-model'i senkronlar (secret bus'a düşmez).
   Doğrulandı (smokeA): connect → şifreli token → entegrasyon aktif (maskeli `****2bff`).
-- **Ertelendi → Faz B:** pazaryeri-özel servislerin (Payment/Order-saga/master-offer/Inventory-rezervasyon)
-  devre dışı/arşivi — yerlerine Shopify read-model geldiğinde yapılacak (doğrulanmış akış yarım kalmasın).
+- **Pazaryeri yapısı SİLİNDİ ✅:** Catalog/Inventory/Order/Payment/Reporting/BFF projeleri, compose/gateway
+  girdileri, DB'leri ve pazaryeri event'leri kaldırıldı (arşiv değil, silme kararı). Kalan çekirdek:
+  Merchant + ShopifySync + Gateway + BuildingBlocks + Contracts.
 - **Bilinen kenar durum:** `CreateMerchant` yalnızca slug benzersizliğini kontrol ediyor; var olan Id ile
   farklı isim → PK çakışması (500 yerine 409 olmalı). Ayrı görev.
 
-### Faz B — Shopify senkron genişletme (read-model)  🟡 (ürün+koleksiyon ✅)
-- Varlıklar: **ürün, varyant, koleksiyon** ✅ | kalan: stok*, fiyat*, indirim, sipariş, müşteri, sayfa
-  (*stok/fiyat varyantta zaten geliyor).
+### Faz B — Shopify senkron genişletme (read-model)  🟡 (ürün+koleksiyon+sipariş+müşteri ✅)
+- Varlıklar: **ürün, varyant, koleksiyon, stok*, fiyat*, sipariş, müşteri** ✅ | kalan: **indirim, sayfa**
+  (*stok/fiyat varyantta geliyor).
+- **Dilim 3 ✅ (2026-07-22) — sipariş + müşteri:** `GetOrdersAsync`/`GetCustomersAsync` (simulator 4 sipariş/
+  3 müşteri, ürünlere referanslı); read-model `SyncedOrder`(+`SyncedOrderLine`) ve `SyncedCustomer`;
+  `StoreSyncService` full-refresh'e dahil; uçlar `GET /api/shopify/orders` (filtre: `customerId`,
+  `financialStatus`), `/orders/{id}`, `/customers` (arama). Migration: ShopifyOrdersCustomers.
+  Doğrulandı (smokeC). **Siparişler SALT OKUNUR** — checkout Shopify'da.
 - **Dilim 1 ✅ (2026-07-22):** ShopifySync = "Store Data" servisi. `IShopifyClient`'a read (`GetProductsAsync`/
   `GetCollectionsAsync`, simulator deterministik katalog + graphql stub); read-model entity'leri
   (`SyncedProduct`/`SyncedVariant`/`SyncedCollection`, tenant=mağaza); `StoreSyncService` (credential çöz →

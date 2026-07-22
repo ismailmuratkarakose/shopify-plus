@@ -19,6 +19,8 @@ public class ShopifySyncDbContext : DbContext
     public DbSet<WebhookInbox> WebhookInbox => Set<WebhookInbox>();
     public DbSet<SyncedProduct> SyncedProducts => Set<SyncedProduct>();
     public DbSet<SyncedCollection> SyncedCollections => Set<SyncedCollection>();
+    public DbSet<SyncedOrder> SyncedOrders => Set<SyncedOrder>();
+    public DbSet<SyncedCustomer> SyncedCustomers => Set<SyncedCustomer>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -82,6 +84,41 @@ public class ShopifySyncDbContext : DbContext
         });
 
         modelBuilder.Entity<SyncedCollectionProduct>(e => e.HasKey(x => x.Id));
+
+        modelBuilder.Entity<SyncedOrder>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Email).HasMaxLength(320);
+            e.Property(x => x.FinancialStatus).HasMaxLength(30).IsRequired();
+            e.Property(x => x.FulfillmentStatus).HasMaxLength(30);
+            e.Property(x => x.Currency).HasMaxLength(3).IsRequired();
+            e.Property(x => x.TotalPrice).HasPrecision(18, 2);
+            e.HasIndex(x => new { x.TenantId, x.ShopifyOrderId }).IsUnique();
+            e.HasIndex(x => new { x.TenantId, x.ShopifyCustomerId });
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.SyncedOrderId).OnDelete(DeleteBehavior.Cascade);
+            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+        });
+
+        modelBuilder.Entity<SyncedOrderLine>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Sku).HasMaxLength(100);
+            e.Property(x => x.Title).HasMaxLength(500).IsRequired();
+            e.Property(x => x.Price).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<SyncedCustomer>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Email).HasMaxLength(320);
+            e.Property(x => x.FirstName).HasMaxLength(200);
+            e.Property(x => x.LastName).HasMaxLength(200);
+            e.Property(x => x.Phone).HasMaxLength(50);
+            e.Property(x => x.TotalSpent).HasPrecision(18, 2);
+            e.HasIndex(x => new { x.TenantId, x.ShopifyCustomerId }).IsUnique();
+            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+        });
 
         modelBuilder.AddOutboxMessage("shopify");
         base.OnModelCreating(modelBuilder);

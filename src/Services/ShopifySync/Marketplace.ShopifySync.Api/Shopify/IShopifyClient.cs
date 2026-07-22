@@ -20,6 +20,18 @@ public record ShopifyProductData(
 
 public record ShopifyCollectionData(long CollectionId, string Title, string Handle, IReadOnlyList<long> ProductIds);
 
+public record ShopifyOrderLineData(
+    long LineId, long ProductId, long VariantId, string? Sku, string Title, int Quantity, decimal Price);
+
+public record ShopifyOrderData(
+    long OrderId, string Name, long? CustomerId, string? Email,
+    string FinancialStatus, string? FulfillmentStatus, decimal TotalPrice, string Currency,
+    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, IReadOnlyList<ShopifyOrderLineData> Lines);
+
+public record ShopifyCustomerData(
+    long CustomerId, string? Email, string? FirstName, string? LastName, string? Phone,
+    int OrdersCount, decimal TotalSpent, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+
 /// <summary>
 /// Shopify Admin API soyutlaması. Transport (GraphQL/REST/simulator) implementasyonlarda gizlenir.
 /// Config `Shopify:ClientMode` ile seçilir.
@@ -38,4 +50,10 @@ public interface IShopifyClient
 
     /// <summary>Mağazanın koleksiyonlarını (ürün üyelikleriyle) çeker.</summary>
     Task<IReadOnlyList<ShopifyCollectionData>> GetCollectionsAsync(ShopifyStoreCredentials store, CancellationToken ct);
+
+    /// <summary>Mağazanın siparişlerini (satırlarıyla) çeker. Checkout Shopify'da olduğu için siparişler salt-okunur.</summary>
+    Task<IReadOnlyList<ShopifyOrderData>> GetOrdersAsync(ShopifyStoreCredentials store, CancellationToken ct);
+
+    /// <summary>Mağazanın müşterilerini çeker (segmentasyon/kişiselleştirme için).</summary>
+    Task<IReadOnlyList<ShopifyCustomerData>> GetCustomersAsync(ShopifyStoreCredentials store, CancellationToken ct);
 }
