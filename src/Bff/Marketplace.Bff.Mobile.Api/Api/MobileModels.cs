@@ -4,39 +4,41 @@ using Marketplace.BuildingBlocks.MultiTenancy;
 
 namespace Marketplace.Bff.Mobile.Api.Api;
 
-// --- Mobil-yüzlü sözleşmeler (tek ekran = tek çağrı hedefiyle sadeleştirilmiş) ---
+// --- Katalog (master + satıcı kıyası) ---
+public record MobileProductDto(Guid Id, string Barcode, string Title, string? Brand, int SellerCount, decimal? MinPrice);
+public record SellerDto(Guid OfferId, Guid MerchantId, string? Sku, decimal Price, string Currency);
+public record MobileProductDetailDto(
+    Guid Id, string Barcode, string Title, string? Description, string? Brand, string? ImageUrl,
+    IReadOnlyList<SellerDto> Sellers);
 
-public record MobileProductDto(
-    Guid Id,
-    string Sku,
-    string Title,
-    string? Description,
-    decimal Price,
-    string Currency,
-    int Available,
-    bool InStock);
+// --- Sepet ---
+public record CartItemDto(Guid OfferId, Guid ProductId, Guid MerchantId, string Barcode, string Title,
+    decimal UnitPrice, int Quantity, decimal LineTotal);
+public record CartViewDto(IReadOnlyList<CartItemDto> Items, string? Currency, decimal TotalAmount, int ItemCount, int MerchantCount);
 
-public record CartItemDto(Guid ProductId, string Sku, string Title, decimal UnitPrice, int Quantity, decimal LineTotal);
-public record CartViewDto(IReadOnlyList<CartItemDto> Items, string? Currency, decimal TotalAmount, int ItemCount);
-
-public record AddToCartRequest(Guid ProductId, int Quantity);
+/// <summary>Sepete ekleme: hangi ürünü (master) hangi satıcıdan (merchant) kaç adet.</summary>
+public record AddToCartRequest(Guid ProductId, Guid MerchantId, int Quantity);
 public record UpdateQtyRequest(int Quantity);
 
-public record CheckoutResponse(Guid OrderId, string Status, decimal TotalAmount, string Currency, string? StatusReason);
+// --- Checkout: sepet satıcıya göre bölünür → merchant başına bir sipariş ---
+public record CheckoutOrderDto(Guid OrderId, Guid MerchantId, string Status, decimal TotalAmount, string Currency, string? StatusReason);
+public record CheckoutResultDto(IReadOnlyList<CheckoutOrderDto> Orders);
 
 public static class CartMapping
 {
     public static CartViewDto ToView(this CartState state)
     {
         var items = state.Lines
-            .Select(l => new CartItemDto(l.ProductId, l.Sku, l.Title, l.UnitPrice, l.Quantity, l.UnitPrice * l.Quantity))
+            .Select(l => new CartItemDto(l.OfferId, l.ProductId, l.MerchantId, l.Barcode, l.Title,
+                l.UnitPrice, l.Quantity, l.UnitPrice * l.Quantity))
             .ToList();
 
         return new CartViewDto(
             items,
             state.Lines.FirstOrDefault()?.Currency,
             items.Sum(i => i.LineTotal),
-            items.Sum(i => i.Quantity));
+            items.Sum(i => i.Quantity),
+            state.Lines.Select(l => l.MerchantId).Distinct().Count());
     }
 }
 

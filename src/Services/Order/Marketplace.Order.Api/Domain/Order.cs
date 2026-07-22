@@ -13,6 +13,9 @@ public enum OrderStatus
 
 public class Order : AuditableTenantEntity
 {
+    // TenantId = SATICI merchant (siparişin sahibi). BuyerRef = alıcı müşteri (JWT sub).
+    public string? BuyerRef { get; set; }
+
     public OrderStatus Status { get; set; } = OrderStatus.Pending;
     public string Currency { get; set; } = "TRY";
     public decimal TotalAmount { get; set; }

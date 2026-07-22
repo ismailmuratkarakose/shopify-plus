@@ -44,7 +44,7 @@ src/
   BuildingBlocks/Marketplace.BuildingBlocks   # Result, ITenantContext, Outbox, Secret şifreleme, ortak Web (auth/tenant)
   Contracts/Marketplace.Contracts             # Servisler arası paylaşılan integration event tipleri
   Gateway/Marketplace.Gateway                 # YARP reverse proxy + auth + rate limit
-  Services/Catalog/Marketplace.Catalog.Api    # Ürün/kategori (outbox'lu)
+  Services/Catalog/Marketplace.Catalog.Api    # Global ürün master (barkod) + merchant teklif (offer); satıcı kıyası (outbox'lu)
   Services/Merchant/Marketplace.Merchant.Api  # Merchant onboarding + şifreli Shopify/ödeme config (outbox'lu)
   Services/Inventory/Marketplace.Inventory.Api # Stok + event consumer'ları (ProductCreated/OrderPlaced)
   Services/Order/Marketplace.Order.Api        # Sipariş + stok rezervasyon koreografisi

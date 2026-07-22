@@ -6,56 +6,48 @@ using Marketplace.BuildingBlocks.MultiTenancy;
 namespace Marketplace.Bff.Mobile.Api.Api;
 
 /// <summary>
-/// Mobil müşteri uygulaması için Backend-for-Frontend uçları. Downstream servisleri (Catalog,
-/// Inventory, Order) çağırıp mobil ekranlara uygun tek DTO'da birleştirir; sepet durumunu Redis'te tutar.
+/// Mobil müşteri BFF'i. Katalog = ürün master + satıcı kıyası (Catalog); sepet Redis'te teklif (offer)
+/// bazlı; checkout sepeti satıcıya göre böler → merchant başına bir sipariş (Order). Stok, ekleme anında
+/// değil checkout saga'sında (Order↔Inventory) zorlanır — satıcının stoğu yetmezse o sipariş reddedilir.
 /// </summary>
 public static class MobileEndpoints
 {
     public static IEndpointRouteBuilder MapMobileEndpoints(this IEndpointRouteBuilder app)
     {
         var api = app.MapGroup("/api/mobile").RequireAuthorization();
-
         MapCatalog(api);
         MapCart(api);
         MapCheckout(api);
         MapOrders(api);
-
         return app;
     }
 
-    // --- Katalog: Catalog + Inventory birleşimi ---
+    // --- Katalog: master + satıcı kıyası ---
     private static void MapCatalog(RouteGroupBuilder api)
     {
         var group = api.MapGroup("/catalog").WithTags("Mobile.Catalog");
 
-        group.MapGet("/", async (ICatalogApi catalog, IInventoryApi inventory,
-            CancellationToken ct, int page = 1, int pageSize = 20) =>
+        group.MapGet("/", async (ICatalogApi catalog, CancellationToken ct,
+            int page = 1, int pageSize = 20, string? search = null) =>
         {
-            var products = await catalog.GetProductsAsync(page, pageSize, ct);
-            var stock = (await inventory.GetAllAsync(ct)).ToDictionary(i => i.ProductId, i => i.Available);
-
-            var result = products.Select(p =>
-            {
-                var available = stock.GetValueOrDefault(p.Id, 0);
-                return new MobileProductDto(p.Id, p.Sku, p.Title, p.Description, p.Price, p.Currency,
-                    available, available > 0);
-            });
+            var products = await catalog.GetProductsAsync(page, pageSize, search, ct);
+            var result = products.Select(p => new MobileProductDto(p.Id, p.Barcode, p.Title, p.Brand, p.OfferCount, p.MinPrice));
             return Results.Ok(result);
         });
 
-        group.MapGet("/{id:guid}", async (Guid id, ICatalogApi catalog, IInventoryApi inventory, CancellationToken ct) =>
+        group.MapGet("/{id:guid}", async (Guid id, ICatalogApi catalog, CancellationToken ct) =>
         {
-            var product = await catalog.GetProductAsync(id, ct);
-            if (product is null)
+            var p = await catalog.GetProductAsync(id, ct);
+            if (p is null)
                 return Results.Problem($"Ürün bulunamadı: {id}", statusCode: StatusCodes.Status404NotFound, title: "product.not_found");
 
-            var available = (await inventory.GetAllAsync(ct)).FirstOrDefault(i => i.ProductId == id)?.Available ?? 0;
-            return Results.Ok(new MobileProductDto(product.Id, product.Sku, product.Title, product.Description,
-                product.Price, product.Currency, available, available > 0));
+            var sellers = p.Offers.Select(o => new SellerDto(o.OfferId, o.MerchantId, o.Sku, o.Price, o.Currency)).ToList();
+            return Results.Ok(new MobileProductDetailDto(
+                p.Product.Id, p.Product.Barcode, p.Product.Title, p.Product.Description, p.Product.Brand, p.Product.ImageUrl, sellers));
         });
     }
 
-    // --- Sepet (Redis) ---
+    // --- Sepet (Redis, teklif bazlı) ---
     private static void MapCart(RouteGroupBuilder api)
     {
         var group = api.MapGroup("/cart").WithTags("Mobile.Cart");
@@ -67,7 +59,7 @@ public static class MobileEndpoints
         });
 
         group.MapPost("/items", async (AddToCartRequest req, ClaimsPrincipal user, ITenantContext tenant,
-            ICartStore store, ICatalogApi catalog, IInventoryApi inventory, CancellationToken ct) =>
+            ICartStore store, ICatalogApi catalog, CancellationToken ct) =>
         {
             if (req.Quantity <= 0)
                 return Results.Problem("Adet 0'dan büyük olmalı.", statusCode: StatusCodes.Status400BadRequest, title: "cart.invalid_quantity");
@@ -76,71 +68,60 @@ public static class MobileEndpoints
             if (product is null)
                 return Results.Problem($"Ürün bulunamadı: {req.ProductId}", statusCode: StatusCodes.Status404NotFound, title: "product.not_found");
 
+            var seller = product.Offers.FirstOrDefault(o => o.MerchantId == req.MerchantId && o.IsActive);
+            if (seller is null)
+                return Results.Problem($"Bu ürün için satıcı teklifi yok: {req.MerchantId}", statusCode: StatusCodes.Status404NotFound, title: "offer.not_found");
+
             var key = CartKey.For(user, tenant);
             var cart = await store.GetAsync(key, ct);
-            var line = cart.Lines.FirstOrDefault(l => l.ProductId == req.ProductId);
-            var desiredQty = (line?.Quantity ?? 0) + req.Quantity;
-
-            var available = (await inventory.GetAllAsync(ct)).FirstOrDefault(i => i.ProductId == req.ProductId)?.Available ?? 0;
-            if (desiredQty > available)
-                return Results.Problem($"Yetersiz stok. Mevcut: {available}", statusCode: StatusCodes.Status409Conflict, title: "cart.insufficient_stock");
-
+            var line = cart.Lines.FirstOrDefault(l => l.OfferId == seller.OfferId);
             if (line is null)
             {
                 cart.Lines.Add(new CartLine
                 {
-                    ProductId = product.Id,
-                    Sku = product.Sku,
-                    Title = product.Title,
-                    UnitPrice = product.Price,
-                    Currency = product.Currency,
+                    OfferId = seller.OfferId,
+                    ProductId = product.Product.Id,
+                    MerchantId = seller.MerchantId,
+                    Barcode = product.Product.Barcode,
+                    Sku = seller.Sku ?? product.Product.Barcode,
+                    Title = product.Product.Title,
+                    UnitPrice = seller.Price,
+                    Currency = seller.Currency,
                     Quantity = req.Quantity
                 });
             }
             else
             {
-                line.Quantity = desiredQty;
-                // Fiyat/başlık anlık kopyayı güncel tut.
-                line.UnitPrice = product.Price;
-                line.Title = product.Title;
-                line.Currency = product.Currency;
+                line.Quantity += req.Quantity;
+                line.UnitPrice = seller.Price; // fiyatı güncel tut
             }
 
             await store.SaveAsync(key, cart, ct);
             return Results.Ok(cart.ToView());
         });
 
-        group.MapPut("/items/{productId:guid}", async (Guid productId, UpdateQtyRequest req, ClaimsPrincipal user,
-            ITenantContext tenant, ICartStore store, IInventoryApi inventory, CancellationToken ct) =>
+        group.MapPut("/items/{offerId:guid}", async (Guid offerId, UpdateQtyRequest req, ClaimsPrincipal user,
+            ITenantContext tenant, ICartStore store, CancellationToken ct) =>
         {
             var key = CartKey.For(user, tenant);
             var cart = await store.GetAsync(key, ct);
-            var line = cart.Lines.FirstOrDefault(l => l.ProductId == productId);
+            var line = cart.Lines.FirstOrDefault(l => l.OfferId == offerId);
             if (line is null)
-                return Results.Problem($"Sepette ürün yok: {productId}", statusCode: StatusCodes.Status404NotFound, title: "cart.item_not_found");
+                return Results.Problem($"Sepette teklif yok: {offerId}", statusCode: StatusCodes.Status404NotFound, title: "cart.item_not_found");
 
-            if (req.Quantity <= 0)
-            {
-                cart.Lines.Remove(line);
-            }
-            else
-            {
-                var available = (await inventory.GetAllAsync(ct)).FirstOrDefault(i => i.ProductId == productId)?.Available ?? 0;
-                if (req.Quantity > available)
-                    return Results.Problem($"Yetersiz stok. Mevcut: {available}", statusCode: StatusCodes.Status409Conflict, title: "cart.insufficient_stock");
-                line.Quantity = req.Quantity;
-            }
+            if (req.Quantity <= 0) cart.Lines.Remove(line);
+            else line.Quantity = req.Quantity;
 
             await store.SaveAsync(key, cart, ct);
             return Results.Ok(cart.ToView());
         });
 
-        group.MapDelete("/items/{productId:guid}", async (Guid productId, ClaimsPrincipal user, ITenantContext tenant,
+        group.MapDelete("/items/{offerId:guid}", async (Guid offerId, ClaimsPrincipal user, ITenantContext tenant,
             ICartStore store, CancellationToken ct) =>
         {
             var key = CartKey.For(user, tenant);
             var cart = await store.GetAsync(key, ct);
-            cart.Lines.RemoveAll(l => l.ProductId == productId);
+            cart.Lines.RemoveAll(l => l.OfferId == offerId);
             await store.SaveAsync(key, cart, ct);
             return Results.Ok(cart.ToView());
         });
@@ -152,7 +133,7 @@ public static class MobileEndpoints
         });
     }
 
-    // --- Checkout: sepetten sipariş oluştur ---
+    // --- Checkout: sepeti satıcıya göre böl → merchant başına bir sipariş ---
     private static void MapCheckout(RouteGroupBuilder api)
     {
         api.MapPost("/checkout", async (ClaimsPrincipal user, ITenantContext tenant,
@@ -163,32 +144,39 @@ public static class MobileEndpoints
             if (cart.Lines.Count == 0)
                 return Results.Problem("Sepet boş.", statusCode: StatusCodes.Status400BadRequest, title: "checkout.empty_cart");
 
-            var currency = cart.Lines[0].Currency;
-            var body = new CreateOrderUpstream(currency,
-                cart.Lines.Select(l => new CreateOrderItemUpstream(l.ProductId, l.Sku, l.Quantity, l.UnitPrice)).ToList());
+            var created = new List<CheckoutOrderDto>();
+            foreach (var group in cart.Lines.GroupBy(l => l.MerchantId))
+            {
+                var currency = group.First().Currency;
+                var body = new CreateOrderUpstream(
+                    currency,
+                    group.Select(l => new CreateOrderItemUpstream(l.ProductId, l.Sku, l.Quantity, l.UnitPrice)).ToList(),
+                    group.Key);
 
-            var order = await orders.CreateAsync(body, ct);
-            if (order is null)
+                var order = await orders.CreateAsync(body, ct);
+                if (order is not null)
+                    created.Add(new CheckoutOrderDto(order.Id, order.MerchantId, order.Status, order.TotalAmount, order.Currency, order.StatusReason));
+            }
+
+            if (created.Count == 0)
                 return Results.Problem("Sipariş oluşturulamadı.", statusCode: StatusCodes.Status502BadGateway, title: "checkout.order_failed");
 
-            // Sipariş oluştu → sepeti temizle. (Saga ödeme/stok akışını asenkron yürütür.)
-            await store.DeleteAsync(key, ct);
-
-            return Results.Ok(new CheckoutResponse(order.Id, order.Status, order.TotalAmount, order.Currency, order.StatusReason));
+            await store.DeleteAsync(key, ct); // siparişler oluştu → sepeti temizle
+            return Results.Ok(new CheckoutResultDto(created));
         }).WithTags("Mobile.Checkout");
     }
 
-    // --- Sipariş takibi (Order proxy) ---
+    // --- Sipariş takibi: alıcının farklı satıcılardaki siparişleri ---
     private static void MapOrders(RouteGroupBuilder api)
     {
         var group = api.MapGroup("/orders").WithTags("Mobile.Orders");
 
         group.MapGet("/", async (IOrderApi orders, CancellationToken ct, int page = 1, int pageSize = 20) =>
-            Results.Ok(await orders.GetOrdersAsync(page, pageSize, ct)));
+            Results.Ok(await orders.GetMyPurchasesAsync(page, pageSize, ct)));
 
         group.MapGet("/{id:guid}", async (Guid id, IOrderApi orders, CancellationToken ct) =>
         {
-            var order = await orders.GetOrderAsync(id, ct);
+            var order = await orders.GetMyPurchaseAsync(id, ct);
             return order is null
                 ? Results.Problem($"Sipariş bulunamadı: {id}", statusCode: StatusCodes.Status404NotFound, title: "order.not_found")
                 : Results.Ok(order);

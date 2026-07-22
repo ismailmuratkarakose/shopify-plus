@@ -3,10 +3,16 @@ using StackExchange.Redis;
 
 namespace Marketplace.Bff.Mobile.Api.Cart;
 
-/// <summary>Redis'te saklanan sepet satırı. Fiyat/başlık, ürün eklendiği andaki değerin anlık kopyasıdır.</summary>
+/// <summary>
+/// Redis'te saklanan sepet satırı = seçilen SATICININ teklifi (offer). Fiyat/başlık, ekleme
+/// anındaki anlık kopyadır. Satır kimliği OfferId'dir (bir satıcının bir master için teklifi).
+/// </summary>
 public sealed class CartLine
 {
-    public Guid ProductId { get; set; }
+    public Guid OfferId { get; set; }
+    public Guid ProductId { get; set; }   // master
+    public Guid MerchantId { get; set; }  // satıcı
+    public string Barcode { get; set; } = "";
     public string Sku { get; set; } = "";
     public string Title { get; set; } = "";
     public decimal UnitPrice { get; set; }

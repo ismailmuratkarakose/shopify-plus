@@ -4,9 +4,18 @@
   "sslRequired": "none",
   "roles": {
     "realm": [
-      { "name": "owner", "description": "Pazaryeri sahibi / platform yöneticisi" },
-      { "name": "platform-admin", "description": "Platform yöneticisi" },
-      { "name": "merchant", "description": "Merchant kullanıcısı" }
+      {
+        "name": "owner",
+        "description": "Pazaryeri sahibi / platform yöneticisi"
+      },
+      {
+        "name": "platform-admin",
+        "description": "Platform yöneticisi"
+      },
+      {
+        "name": "merchant",
+        "description": "Merchant kullanıcısı"
+      }
     ]
   },
   "clients": [
@@ -16,8 +25,12 @@
       "publicClient": true,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
-      "redirectUris": ["*"],
-      "webOrigins": ["*"],
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
       "protocolMappers": [
         {
           "name": "tenant_id",
@@ -43,9 +56,21 @@
       "firstName": "Demo",
       "lastName": "Merchant",
       "requiredActions": [],
-      "credentials": [{ "type": "password", "value": "demo123", "temporary": false }],
-      "realmRoles": ["merchant"],
-      "attributes": { "tenant_id": ["11111111-1111-1111-1111-111111111111"] }
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "merchant"
+      ],
+      "attributes": {
+        "tenant_id": [
+          "11111111-1111-1111-1111-111111111111"
+        ]
+      }
     },
     {
       "username": "demo-owner",
@@ -55,8 +80,41 @@
       "firstName": "Demo",
       "lastName": "Owner",
       "requiredActions": [],
-      "credentials": [{ "type": "password", "value": "demo123", "temporary": false }],
-      "realmRoles": ["owner", "platform-admin"]
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "owner",
+        "platform-admin"
+      ]
+    },
+    {
+      "username": "demo-merchant2",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "merchant2@demo.local",
+      "firstName": "Demo",
+      "lastName": "Merchant2",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "merchant"
+      ],
+      "attributes": {
+        "tenant_id": [
+          "22222222-2222-2222-2222-222222222222"
+        ]
+      }
     }
   ]
 }

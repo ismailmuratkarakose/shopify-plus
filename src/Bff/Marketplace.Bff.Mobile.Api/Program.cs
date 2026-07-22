@@ -30,7 +30,6 @@ void AddDownstream<TClient, TImpl>(string serviceKey)
         .AddHttpMessageHandler<AuthForwardingHandler>();
 
 AddDownstream<ICatalogApi, CatalogApiClient>("Catalog");
-AddDownstream<IInventoryApi, InventoryApiClient>("Inventory");
 AddDownstream<IOrderApi, OrderApiClient>("Order");
 
 // --- Kimlik doğrulama: Keycloak (OIDC/JWT) — ortak yapı taşı ---
