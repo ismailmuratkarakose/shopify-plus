@@ -1,6 +1,10 @@
 using System.Text.Json;
+using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.BuildingBlocks.Security;
+using Marketplace.BuildingBlocks.Web;
+using Marketplace.Merchant.Api.Application;
 using Marketplace.Merchant.Api.Infrastructure;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Marketplace.Merchant.Api.Api;
@@ -48,6 +52,28 @@ public static class InternalEndpoints
                 provider,
                 config = configDict
             });
+        });
+
+        // Server-to-server yazma: OAuth callback gibi JWT taşımayan akışlar entegrasyon config'i buradan kaydeder.
+        // Tenant'ı merchantId'den kurup mevcut UpsertIntegration handler'ını kullanır (şifreler + event yayınlar).
+        group.MapPost("/integrations/{merchantId:guid}/{provider}", async (
+            Guid merchantId,
+            string provider,
+            Dictionary<string, string> config,
+            HttpContext http,
+            IConfiguration appConfig,
+            ITenantContext tenant,
+            ISender sender) =>
+        {
+            var expected = appConfig["Internal:ApiKey"];
+            var provided = http.Request.Headers["X-Internal-Api-Key"].ToString();
+            if (string.IsNullOrEmpty(expected) || provided != expected)
+                return Results.Unauthorized();
+
+            // Internal çağrı JWT tenant taşımaz → tenant'ı merchantId'den kur (aynı request scope handler'a taşınır).
+            tenant.SetTenant(merchantId, isPlatformScope: false);
+            var result = await sender.Send(new UpsertIntegrationCommand(provider, config));
+            return result.ToHttpResult();
         });
 
         return app;

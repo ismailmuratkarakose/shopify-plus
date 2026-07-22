@@ -33,12 +33,25 @@ builder.Services.AddHttpClient<IMerchantCredentialClient, MerchantCredentialClie
 
 builder.Services.AddScoped<ShopifyWebhookProcessor>();
 
-// Shopify client: config ile simulator / graphql seçilir.
+// Shopify client + OAuth: config ile simulator / graphql seçilir.
 var clientMode = builder.Configuration["Shopify:ClientMode"] ?? "simulator";
 if (string.Equals(clientMode, "graphql", StringComparison.OrdinalIgnoreCase))
+{
     builder.Services.AddHttpClient<IShopifyClient, GraphQlShopifyClient>();
+    builder.Services.AddHttpClient<IShopifyOAuth, GraphQlShopifyOAuth>();
+}
 else
+{
     builder.Services.AddSingleton<IShopifyClient, SimulatorShopifyClient>();
+    builder.Services.AddSingleton<IShopifyOAuth, SimulatorShopifyOAuth>();
+}
+
+// OAuth connect/callback entegrasyon config'i Merchant'a internal write ile kaydeder.
+builder.Services.AddHttpClient<IMerchantIntegrationWriter, MerchantIntegrationWriter>(c =>
+{
+    c.BaseAddress = new Uri(builder.Configuration["Merchant:InternalBaseUrl"]!);
+    c.DefaultRequestHeaders.Add("X-Internal-Api-Key", builder.Configuration["Internal:ApiKey"]!);
+});
 
 builder.Services.AddMassTransit(x =>
 {
@@ -78,6 +91,7 @@ app.UseAuthorization();
 
 app.MapHealthChecks("/health");
 app.MapShopifyEndpoints();
+app.MapShopifyOAuthEndpoints();
 app.MapShopifyWebhookEndpoints();
 
 app.Run();

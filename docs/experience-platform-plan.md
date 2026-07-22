@@ -47,11 +47,17 @@ Bu döküman ise farklı bir ürün tarif ediyor:
 
 ## 4. Fazlı yol haritası (çekirdek A–L, opsiyonel N; UI hariç)
 
-### Faz A — Yeniden hizalama & Shopify bağlantısı
-- Kavram: tenant = Shopify mağazası. Merchant→Store terminolojisi.
-- Gerçek **Shopify OAuth** akışı (mağaza kurulumu, access token, scope'lar) — mevcut şifreli config üstüne.
-- Pazaryeri-özel servisleri (Payment/Order-saga/master-offer/Inventory-rezervasyon) devre dışı/arşiv.
-- Çıktı: bir Shopify mağazası bağlanır, token güvenli saklanır, sağlık doğrulanır.
+### Faz A — Yeniden hizalama & Shopify bağlantısı  🟡 (bağlantı ✅)
+- Kavram: tenant = Shopify mağazası. Merchant→Store terminolojisi (kavramsal; toplu rename ertelendi).
+- **Shopify OAuth akışı ✅ (2026-07-22):** `IShopifyOAuth` (simulator token üretir / graphql authorize+exchange);
+  `POST /api/shopify/connect` (mağaza sahibi, JWT tenant) + `GET /shopify/oauth/callback` (anonim, graphql).
+  Token Merchant'a **internal write** (`POST /internal/integrations/{id}/shopify`) ile kaydedilir →
+  mevcut `MerchantIntegrationConfigured` pipeline'ı read-model'i senkronlar (secret bus'a düşmez).
+  Doğrulandı (smokeA): connect → şifreli token → entegrasyon aktif (maskeli `****2bff`).
+- **Ertelendi → Faz B:** pazaryeri-özel servislerin (Payment/Order-saga/master-offer/Inventory-rezervasyon)
+  devre dışı/arşivi — yerlerine Shopify read-model geldiğinde yapılacak (doğrulanmış akış yarım kalmasın).
+- **Bilinen kenar durum:** `CreateMerchant` yalnızca slug benzersizliğini kontrol ediyor; var olan Id ile
+  farklı isim → PK çakışması (500 yerine 409 olmalı). Ayrı görev.
 
 ### Faz B — Shopify senkron genişletme (read-model)
 - Varlıklar: **ürün, varyant, koleksiyon, stok, fiyat, indirim, sipariş, müşteri, sayfa**.
