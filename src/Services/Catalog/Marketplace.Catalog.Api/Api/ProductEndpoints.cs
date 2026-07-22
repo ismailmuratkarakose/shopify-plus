@@ -8,28 +8,35 @@ public static class ProductEndpoints
 {
     public static IEndpointRouteBuilder MapProductEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/products")
-            .RequireAuthorization()
-            .WithTags("Products");
+        // --- Merchant teklifleri (kendi fiyat/stok) ---
+        var offers = app.MapGroup("/api/offers").RequireAuthorization().WithTags("Offers");
 
-        group.MapGet("/", async (ISender sender, int page = 1, int pageSize = 20) =>
-        {
-            var result = await sender.Send(new GetProductsQuery(page, pageSize));
-            return result.ToHttpResult();
-        });
+        offers.MapPost("/", async (CreateOfferCommand cmd, ISender sender) =>
+            (await sender.Send(cmd)).ToHttpResult(created: true, location: r => $"/api/offers/{r.Id}"));
 
-        group.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
-        {
-            var result = await sender.Send(new GetProductByIdQuery(id));
-            return result.ToHttpResult();
-        });
+        offers.MapGet("/", async (ISender sender, int page = 1, int pageSize = 20) =>
+            (await sender.Send(new GetMyOffersQuery(page, pageSize))).ToHttpResult());
 
-        group.MapPost("/", async (CreateProductCommand cmd, ISender sender) =>
-        {
-            var result = await sender.Send(cmd);
-            return result.ToHttpResult(created: true, location: r => $"/api/products/{r.Id}");
-        });
+        offers.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
+            (await sender.Send(new GetOfferByIdQuery(id))).ToHttpResult());
+
+        offers.MapPut("/{id:guid}", async (Guid id, UpdateOfferBody body, ISender sender) =>
+            (await sender.Send(new UpdateOfferCommand(id, body.Price, body.IsActive))).ToHttpResult());
+
+        // --- Global ürün kataloğu (master + satıcı kıyası) ---
+        var products = app.MapGroup("/api/products").RequireAuthorization().WithTags("Products");
+
+        products.MapGet("/", async (ISender sender, int page = 1, int pageSize = 20, string? search = null) =>
+            (await sender.Send(new GetProductsQuery(page, pageSize, search))).ToHttpResult());
+
+        products.MapGet("/{id:guid}", async (Guid id, ISender sender) =>
+            (await sender.Send(new GetProductByIdQuery(id))).ToHttpResult());
+
+        products.MapGet("/by-barcode/{barcode}", async (string barcode, ISender sender) =>
+            (await sender.Send(new GetProductByBarcodeQuery(barcode))).ToHttpResult());
 
         return app;
     }
 }
+
+public record UpdateOfferBody(decimal Price, bool IsActive);

@@ -23,7 +23,7 @@ builder.Services.AddDbContext<CatalogDbContext>(opt =>
 
 // --- MediatR + FluentValidation ---
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
-builder.Services.AddValidatorsFromAssemblyContaining<CreateProductValidator>();
+builder.Services.AddValidatorsFromAssemblyContaining<CreateOfferValidator>();
 
 // --- MassTransit / RabbitMQ (event bus) ---
 builder.Services.AddMassTransit(x =>

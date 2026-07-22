@@ -5,17 +5,26 @@ namespace Marketplace.Contracts;
 // Servisler arası TÜKETİLEN event'ler burada tek CLR tipinden tanımlanır.
 // Yayınlayan ve tüketen aynı tipi kullanır → MassTransit MessageUrn eşleşmesi garanti.
 
-/// <summary>Catalog bir ürün oluşturduğunda. Inventory stok kaydı açar, ShopifySync outbound push eder.</summary>
+/// <summary>
+/// Bir merchant bir ürün master'ına teklif (Offer) açtığında yayınlanır.
+/// Inventory (tenant, ProductId=master) stok kaydı açar; ShopifySync outbound push eder.
+/// (İsim geriye-uyum için korunur; artık offer düzeyindedir.)
+/// </summary>
 public record ProductCreatedIntegrationEvent : IntegrationEvent
 {
+    /// <summary>Master ürün kimliği (stok bu anahtara bağlanır).</summary>
     public Guid ProductId { get; init; }
+    /// <summary>Bu event'i doğuran offer.</summary>
+    public Guid OfferId { get; init; }
+    /// <summary>Master'ın evrensel kimliği (GTIN/EAN).</summary>
+    public string Barcode { get; init; } = default!;
     public string Sku { get; init; } = default!;
     public string Title { get; init; } = default!;
     public string? Description { get; init; }
     public decimal Price { get; init; }
     public string Currency { get; init; } = default!;
 
-    /// <summary>Ürünün kaynağı ("marketplace" / "shopify"). Döngü önleme: shopify kaynaklı ürün tekrar push edilmez.</summary>
+    /// <summary>Teklifin kaynağı ("marketplace" / "shopify"). Döngü önleme: shopify kaynaklı teklif tekrar push edilmez.</summary>
     public string Source { get; init; } = "marketplace";
 }
 
@@ -88,6 +97,8 @@ public record StockReleaseRequestedIntegrationEvent : IntegrationEvent
 public record ProductUpsertedFromShopifyIntegrationEvent : IntegrationEvent
 {
     public long ShopifyProductId { get; init; }
+    /// <summary>Shopify varyantının barkodu (GTIN). Master eşleşmesi için; boşsa Sku'ya düşülür.</summary>
+    public string? Barcode { get; init; }
     public string Sku { get; init; } = default!;
     public string Title { get; init; } = default!;
     public string? Description { get; init; }
