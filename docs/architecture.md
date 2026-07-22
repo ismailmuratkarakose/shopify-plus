@@ -72,7 +72,11 @@
 | **3** ✅ | Ödeme | Payment servisi, `IPaymentProvider` (simulator + iyzico + PayPal gerçek-yapı), provider resolver (merchant config), Order↔Payment↔Inventory saga + telafi (ödeme başarısızsa stok geri bırakılır) |
 | **4** ✅ | Mobil BFF | `Marketplace.Bff.Mobile.Api` (aggregation, DB'siz): Catalog+Inventory birleşik katalog DTO'su, Redis-backed sepet (kullanıcı+tenant kapsamlı), checkout → Order oluşturma → saga, sipariş takibi; downstream'e JWT forwarding (`AuthForwardingHandler`) |
 | **5** ✅ | Raporlama + owner | `Marketplace.Reporting.Api` (event-sourced read-model, DB'siz publish): MerchantRegistered/OrderPlaced/PaymentSucceeded/PaymentFailed tüketir; komisyon = tutar × merchant oranı; scope-aware `/api/reports/*` (özet, owner-only merchant kırılımı, günlük ciro serisi) |
-| **6** | K8s sertleştirme | Helm chart'lar, autoscaling, probe'lar, observability, yük testi |
+| **7** 🔜 | **Katalog pivotu** | Global ürün master (Barkod/GTIN) + merchant teklif/offer modeli; barkodla find-or-create; Inventory (tenant,master) anahtarlı; Order satırı offer'a bağlı; çok-merchant sepette checkout merchant başına N siparişe bölünür; BFF katalog = ürün→satıcı kıyası |
+| **8** 🔜 | Kargo/Shipping | `IShippingProvider` (simulator + gerçek-yapı), merchant başına şifreli kargo config, Paid→gönderi oluştur + takip no + durum |
+| **6** ⏸ | K8s sertleştirme | Helm chart'lar, autoscaling, probe'lar, observability, yük testi, compose startup yarışı fix |
+
+> **Not (2026-07-22):** Katalog Faz 1-5'te "her merchant kendi bağımsız ürünü" olarak kuruldu. Gerçek pazaryeri gereksinimi (aynı ürün — barkod ile tek kimlik — birden çok satıcı, farklı fiyat) için Faz 7'de **ortak ürün master + teklif** modeline geçilecek. Frontend bu repoda yok (yalnızca REST API).
 
 ## 9. Uygulanan altyapı (Faz 1)
 
