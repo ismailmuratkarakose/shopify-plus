@@ -96,6 +96,14 @@ public sealed partial class GraphQlShopifyClient : IShopifyClient
         return new ShopifyProductRef(id);
     }
 
+    // Read senkronu (Faz B): gerçek GraphQL products/collections sorguları bir mağaza bağlandığında
+    // eklenecek (bulk operations / pagination). Şimdilik simulator modunda çalışılır.
+    public Task<IReadOnlyList<ShopifyProductData>> GetProductsAsync(ShopifyStoreCredentials store, CancellationToken ct)
+        => throw new NotImplementedException("GraphQL ürün okuma Faz B'de simulator ile çalışıyor; gerçek sorgu ileride.");
+
+    public Task<IReadOnlyList<ShopifyCollectionData>> GetCollectionsAsync(ShopifyStoreCredentials store, CancellationToken ct)
+        => throw new NotImplementedException("GraphQL koleksiyon okuma Faz B'de simulator ile çalışıyor; gerçek sorgu ileride.");
+
     [GeneratedRegex(@"gid://shopify/Product/(\d+)")]
     private static partial Regex ProductGidRegex();
 }

@@ -32,6 +32,7 @@ builder.Services.AddHttpClient<IMerchantCredentialClient, MerchantCredentialClie
 });
 
 builder.Services.AddScoped<ShopifyWebhookProcessor>();
+builder.Services.AddScoped<StoreSyncService>();
 
 // Shopify client + OAuth: config ile simulator / graphql seçilir.
 var clientMode = builder.Configuration["Shopify:ClientMode"] ?? "simulator";
@@ -92,6 +93,7 @@ app.UseAuthorization();
 app.MapHealthChecks("/health");
 app.MapShopifyEndpoints();
 app.MapShopifyOAuthEndpoints();
+app.MapStoreDataEndpoints();
 app.MapShopifyWebhookEndpoints();
 
 app.Run();

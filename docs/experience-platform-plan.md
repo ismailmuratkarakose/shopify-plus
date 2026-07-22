@@ -59,10 +59,17 @@ Bu döküman ise farklı bir ürün tarif ediyor:
 - **Bilinen kenar durum:** `CreateMerchant` yalnızca slug benzersizliğini kontrol ediyor; var olan Id ile
   farklı isim → PK çakışması (500 yerine 409 olmalı). Ayrı görev.
 
-### Faz B — Shopify senkron genişletme (read-model)
-- Varlıklar: **ürün, varyant, koleksiyon, stok, fiyat, indirim, sipariş, müşteri, sayfa**.
-- Webhook (create/update/delete) + periyodik **reconciliation** (drift düzeltme) + ilk toplu import.
-- Idempotency/inbox (mevcut desen), rate-limit/backoff (Shopify API limitleri).
+### Faz B — Shopify senkron genişletme (read-model)  🟡 (ürün+koleksiyon ✅)
+- Varlıklar: **ürün, varyant, koleksiyon** ✅ | kalan: stok*, fiyat*, indirim, sipariş, müşteri, sayfa
+  (*stok/fiyat varyantta zaten geliyor).
+- **Dilim 1 ✅ (2026-07-22):** ShopifySync = "Store Data" servisi. `IShopifyClient`'a read (`GetProductsAsync`/
+  `GetCollectionsAsync`, simulator deterministik katalog + graphql stub); read-model entity'leri
+  (`SyncedProduct`/`SyncedVariant`/`SyncedCollection`, tenant=mağaza); `StoreSyncService` (credential çöz →
+  Shopify'dan çek → full-refresh upsert); uçlar `POST /api/shopify/sync`, `GET /api/shopify/products`,
+  `/products/{id}`, `/collections`. Migration: ShopifyReadModel. Doğrulandı (smokeB): sync → 5 ürün
+  (varyant+sku+barkod+fiyat+stok) + 2 koleksiyon.
+- **Kalan dilimler:** webhook→read-model incremental (mevcut inbox/HMAC deseni) + periyodik reconciliation;
+  sipariş/müşteri/sayfa/indirim; rate-limit/backoff; ardından pazaryeri Catalog/Order/Inventory/Payment ARŞİVİ.
 - Çıktı: mağaza verisinin güncel read-model'i; CMS ve kişiselleştirme bunu okur.
 
 ### Faz C — Deneyim/İçerik CMS çekirdeği (sürükle-bırak veri modeli)
