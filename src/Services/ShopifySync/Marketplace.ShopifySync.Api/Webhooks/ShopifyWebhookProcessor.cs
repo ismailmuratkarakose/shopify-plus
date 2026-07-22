@@ -69,22 +69,28 @@ public sealed class ShopifyWebhookProcessor
             }
         }
 
-        var product = await _db.SyncedProducts.Include(x => x.Variants)
+        // Robust upsert: varsa sil (cascade variant) + SaveChanges, sonra taze ekle (pull-sync ile aynı desen).
+        var existing = await _db.SyncedProducts.Include(x => x.Variants)
             .FirstOrDefaultAsync(x => x.ShopifyProductId == shopifyProductId, ct);
-        if (product is null)
+        if (existing is not null)
         {
-            product = new SyncedProduct { TenantId = pre.TenantId, ShopifyProductId = shopifyProductId };
-            _db.SyncedProducts.Add(product);
+            _db.SyncedProducts.Remove(existing);
+            await _db.SaveChangesAsync(ct);
         }
-        product.Title = title;
-        product.Description = description;
-        product.Vendor = vendor;
-        product.ProductType = productType;
-        product.Handle = string.IsNullOrEmpty(handle) ? title.ToLowerInvariant().Replace(' ', '-') : handle;
-        product.Status = status;
-        product.ShopifyUpdatedAt = updatedAt;
-        product.Variants.Clear();
-        foreach (var v in variants) product.Variants.Add(v);
+
+        _db.SyncedProducts.Add(new SyncedProduct
+        {
+            TenantId = pre.TenantId,
+            ShopifyProductId = shopifyProductId,
+            Title = title,
+            Description = description,
+            Vendor = vendor,
+            ProductType = productType,
+            Handle = string.IsNullOrEmpty(handle) ? title.ToLowerInvariant().Replace(' ', '-') : handle,
+            Status = status,
+            ShopifyUpdatedAt = updatedAt,
+            Variants = variants
+        });
 
         await CompleteAsync(pre, ct);
         _logger.LogInformation("Shopify inbound ürün → read-model: shopifyId={Id} tenant={Tenant}", shopifyProductId, pre.TenantId);
