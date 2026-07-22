@@ -64,6 +64,11 @@
 
 ## 8. Yol haritası (fazlar)
 
+> **🔀 YÖN DEĞİŞİKLİĞİ (2026-07-22):** Müşteri dökümanı gereği proje, kendi ödeme/sipariş akışlı **pazaryerinden**,
+> **Shopify Mobil Deneyim & Kişiselleştirme Platformu**na (checkout/ödeme/sipariş Shopify'da; CMS + kişiselleştirme + Shopify senkron)
+> **dönüştürülüyor**. Aşağıdaki Faz 0–8 tablosu *pazaryeri* geçmişini gösterir; Payment/Order-saga/master-offer bu spec'te
+> arşivlenir. Yeni gap analizi ve fazlı yol haritası (A–O): **[experience-platform-plan.md](experience-platform-plan.md)**.
+
 | Faz | Kapsam | Çıktı |
 |---|---|---|
 | **0** ✅ | İskele | Monorepo, BuildingBlocks, Gateway, Catalog dikey kesiti, docker-compose, Keycloak realm |
