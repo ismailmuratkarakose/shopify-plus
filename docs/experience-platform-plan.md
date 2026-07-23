@@ -6,6 +6,34 @@
 > ilgili faz tamamen kaldırıldı.** **Mobil uygulama (React Native) ve web admin UI
 > kapsam dışı**; yalnızca backend/REST API'ler (mobilin ve web panelin *backing* servisleri) inşa edilir.
 
+## 0. 🔴 KAPSAM DÜZELTMESİ (2026-07-23): Shopify zorunlu değil
+
+Her merchant Shopify kullanmak zorunda **değildir**. Ürünlerini ve **kategorilerini** manuel olarak
+veya **Excel/CSV içeri aktarımla** yönetmek isteyebilir. Shopify, zorunlu bir bağımlılık değil,
+**opsiyonel bir entegrasyondur** ("varsa kolayca bağlansın").
+
+**Mevcut kodda Shopify'a sert bağımlı olan yerler (doğrulandı):**
+1. **Mağaza aktivasyonu** — `Pending` → `Active` yalnızca Shopify bağlanınca; Shopify'sız mağaza kalıcı Pending.
+2. **Mobil katalog** — `/api/shopify/products` okuyor; Shopify'sız mağazada katalog boş.
+3. **Mobil checkout** — Shopify sepet bağlantısı üretiyor; entegrasyon yoksa 409 → satın alma yolu yok.
+4. **CMS içerik doğrulaması** — referansları Shopify read-model'ine karşı doğruluyor; Shopify'sız
+   mağazada tüm ürün/koleksiyon referansları kırık sayılır ve **yayınlama engellenir**.
+
+**Hedef mimari:** Platformun kendi **Katalog servisi** (mağaza başına ürün + varyant + kategori;
+her kayıtta `Source`: `manual` / `excel` / `shopify`). Manuel CRUD, Excel içeri aktarım ve Shopify
+senkronu bu kataloğu **besler**; Mobil API, CMS doğrulaması ve kişiselleştirme ortak kataloğu okur.
+Aktivasyon Shopify'dan koparılır. (Faz B'de silinen Catalog servisi geri gelir — ancak pazaryeri
+master/offer semantiğiyle değil, mağaza-başına katalog olarak.)
+
+**AÇIK KARAR — Shopify'sız mağaza nasıl satış yapacak?**
+- **(a)** Katalog + deneyim modu: sipariş platform dışında (telefon, WhatsApp, kendi sitesi). Ek efor ~0.
+- **(b)** Platformun kendi sepet/sipariş/ödeme altyapısı: silinen Order/Payment/Inventory doğru
+  semantikle geri gelir. Ek efor ~40–60 adam-gün.
+- **(c)** `ICommerceProvider` soyutlaması: checkout da eklenti (Shopify + native). (b) + ~8 gün.
+
+Karar verilmeden katalog refactor'üne başlanmamalıdır; (b)/(c) seçilirse teklif eforu
+311 → ~370+ adam-güne çıkar.
+
 ## 1. Ürün şekli farkı (kritik)
 
 Şu ana kadar **kendi ödeme/sipariş/komisyon akışı olan çok-satıcılı bir pazaryeri** kuruldu (Faz 0–5, 7).
