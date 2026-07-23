@@ -204,8 +204,28 @@ Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
   olarak üç ayrı gruba bölündü. Realm'e roller + `demo-editor`, `demo-publisher` kullanıcıları eklendi.
   Doğrulandı (smokeH): editör hazırlar ve medya yükler ama **publish/bayrak/rebuild → 403**;
   yayın yöneticisi yayınlar ve düzenler; mağaza açma yalnızca owner (editör 403, owner 201).
-- **Kalan:** J-03 kullanıcı yönetim uçları (davet, rol atama, pasifleştirme — Keycloak Admin API),
-  J-05 denetim kaydı (audit log), J-06 testler.
+- **J-03 ✅ (2026-07-23) — kullanıcı yönetimi + mağaza adına işlem:**
+  - **Keycloak Admin entegrasyonu:** realm'e confidential client `marketplace-admin-api`
+    (service account: manage-users/view-users/query-users). `IKeycloakAdminClient` token
+    önbellekli; kullanıcı listeleme (mağazaya göre `q=tenant_id:`), oluşturma, rol atama
+    (tek rol modeli: eskisi kaldırılır), aktif/pasif, şifre sıfırlama e-postası.
+  - **Uçlar:** `/api/users` (liste, davet, rol değiştir, aktifleştir/pasifleştir, şifre sıfırla)
+    ve `/api/users/roles` — hepsi `store.manage` yetkisinde. Hedef kullanıcının aynı mağazaya
+    ait olduğu doğrulanır (başka mağazanın kullanıcısına müdahale → 403).
+  - **Mağaza adına işlem (J-04):** platform personelinin `tenant_id` claim'i yoktur; artık
+    `X-Acting-Store` başlığıyla bir mağazanın kapsamına girer (`TenantResolutionMiddleware`).
+    Bu olmadan yaptığı yazma işlemleri **sahipsiz kayıt** üretiyordu. Başlık yalnızca platform
+    rolleri için geçerlidir — mağaza kullanıcısı gönderse bile yok sayılır (kapsam kaçışı yok).
+  - **YAKALANAN HATA (Keycloak 26):** "declarative user profile" tanımlanmamış öznitelikleri
+    **sessizce siler**; Admin API ile açılan kullanıcının `tenant_id`'si kayboluyor ve kullanıcı
+    mağazasız kalıyordu. Realm user profile'ına `tenant_id` tanımlandı (+ `unmanagedAttributePolicy: ENABLED`)
+    ve kod, oluşturma sonrası özniteliği doğrulayıp kaybolursa açık hata veriyor.
+  - Doğrulandı (smokeI): davet→rol değiştir→pasifleştir/aktifleştir; editör 403; platform mağaza
+    seçmeden 400; acting-store ile yazılan sayfa **doğru mağazada** göründü; mağaza kullanıcısı
+    başlıkla kapsam değiştiremedi.
+  - **Operasyonel not:** Keycloak `--force-recreate` sonrası imzalama anahtarları değişir;
+    servislerin JWKS önbelleği bir süre bayat kalıp 401 üretebilir (kendiliğinden düzelir).
+- **Kalan:** J-05 denetim kaydı (audit log), J-06 testler.
 
 **J-07…J-10 — Üyelik ve kimlik akışları (+15 adam-gün, plana yeni eklendi):**
 - **J-07 · Mağaza self-service kaydı ve sağlama (provisioning) — 5 gün.** Kayıt formu API'si →
