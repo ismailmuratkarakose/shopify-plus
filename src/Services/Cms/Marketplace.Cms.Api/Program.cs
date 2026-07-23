@@ -1,3 +1,4 @@
+using Marketplace.BuildingBlocks.Auditing;
 using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.BuildingBlocks.Web;
 using Marketplace.Cms.Api.Api;
@@ -28,6 +29,7 @@ builder.Services.AddHttpClient<IStoreDataClient, StoreDataClient>(c =>
     .AddHttpMessageHandler<AuthForwardingHandler>();
 builder.Services.AddScoped<ContentValidator>();
 builder.Services.AddScoped<SnapshotBuilder>();
+builder.Services.AddAuditLogging<CmsDbContext>();
 
 builder.Services.AddKeycloakJwtAuth(builder.Configuration, builder.Environment);
 
@@ -51,6 +53,7 @@ app.MapPageEndpoints();
 app.MapExperienceEndpoints();
 app.MapPreviewEndpoints();
 app.MapMediaEndpoints();
+app.MapAuditEndpoints<CmsDbContext>();
 
 app.Run();
 

@@ -1,3 +1,4 @@
+using Marketplace.BuildingBlocks.Auditing;
 using Marketplace.BuildingBlocks.Web;
 using Marketplace.Merchant.Api.Domain;
 using Marketplace.Merchant.Api.Identity;
@@ -101,6 +102,19 @@ public static class SignupEndpoints
             }
 
             logger.LogInformation("Yeni mağaza kaydı: {Store} ({StoreId}) yönetici={User}", slug, store.Id, username);
+
+            // Kayıt izini denetim defterine düş (aktör anonimdir; mağaza kimliği açıkça yazılır).
+            db.Set<Marketplace.BuildingBlocks.Auditing.AuditEntry>().Add(new Marketplace.BuildingBlocks.Auditing.AuditEntry
+            {
+                TenantId = store.Id,
+                ActorId = "self-service",
+                ActorName = username,
+                Action = "store.signup",
+                EntityType = "Store",
+                EntityId = store.Id.ToString(),
+                Summary = $"'{store.Name}' mağazası self-service kayıtla oluşturuldu"
+            });
+            await db.SaveChangesAsync(ct);
 
             return Results.Created($"/api/merchants/{store.Id}", new
             {

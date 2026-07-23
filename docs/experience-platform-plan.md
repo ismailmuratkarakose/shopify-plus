@@ -225,7 +225,24 @@ Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
     başlıkla kapsam değiştiremedi.
   - **Operasyonel not:** Keycloak `--force-recreate` sonrası imzalama anahtarları değişir;
     servislerin JWKS önbelleği bir süre bayat kalıp 401 üretebilir (kendiliğinden düzelir).
-- **Kalan:** J-05 denetim kaydı (audit log), J-06 testler.
+- **J-05 ✅ (2026-07-23) — denetim kaydı (audit log):**
+  Ortak yapı taşı (`BuildingBlocks/Auditing`, Outbox desenini izler): `AuditEntry` (aktör, roller,
+  mağaza, **mağaza adına mı**, işlem, varlık, özet, zaman) + `modelBuilder.AddAuditLog(filtre, şema)` +
+  `IAuditLogger.Record(...)`. Kayıt, iş verisiyle **aynı SaveChanges** içinde yazılır — işlem geri
+  alınırsa denetim kaydı da oluşmaz.
+  **Kaydedilen işlemler:** CMS → `page.publish`, `page.restore`, `page.delete`, `flag.changed`,
+  `media.upload`; Merchant → `store.signup`, `user.invited`, `user.role_changed`, `user.deactivated`.
+  **Sorgu:** `GET /api/audit` (içerik) ve `GET /api/audit/account` (hesap) — `store.manage` yetkisi,
+  mağaza kapsamına göre filtreli.
+  **YAKALANAN HATA (EF model önbelleği):** kiracı filtresine `ITenantContext` **parametre olarak**
+  geçirilince, model bir kez kurulup önbelleğe alındığı için ilk isteğin tenant nesnesi closure'da
+  donuyor ve sonraki isteklerde filtre hiçbir kaydı döndürmüyordu (kayıtlar yazılıyor ama görünmüyordu).
+  Çözüm: filtre ifadesi çağırandan alınır ve **DbContext alanını** (`_tenant`) referans eder —
+  EF bunu her sorguda yeniden değerlendirir (diğer entity'lerdeki mevcut desen).
+  Doğrulandı (smokeK): yayının `publish-manager` tarafından yapıldığı, platform personelinin
+  "mağaza adına" işleminin işaretlendiği, editörün denetim kaydını göremediği (403) ve
+  mağazalar arası izolasyon.
+- **Kalan:** J-06 testler.
 
 **J-07…J-10 — Üyelik ve kimlik akışları (+15 adam-gün, plana yeni eklendi):**
 - **J-07 ✅ (2026-07-23) — Mağaza self-service kaydı ve sağlama:**

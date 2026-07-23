@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using FluentValidation;
+using Marketplace.BuildingBlocks.Auditing;
 using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.BuildingBlocks.Outbox;
 using Marketplace.BuildingBlocks.Security;
@@ -67,6 +68,7 @@ builder.Services.AddRateLimiter(options =>
 });
 
 // Panel kullanıcılarının Keycloak üzerinde yönetimi (service account ile).
+builder.Services.AddAuditLogging<MerchantDbContext>();
 builder.Services.AddHttpClient<IKeycloakAdminClient, KeycloakAdminClient>(c =>
     c.BaseAddress = new Uri(builder.Configuration["Keycloak:BaseUrl"] ?? "http://keycloak:8080"));
 
@@ -92,6 +94,7 @@ app.MapHealthChecks("/health");
 app.MapMerchantEndpoints();
 app.MapUserEndpoints();
 app.MapSignupEndpoints();
+app.MapAuditEndpoints<MerchantDbContext>("/api/audit/account");
 app.MapMerchantInternalEndpoints();
 
 app.Run();

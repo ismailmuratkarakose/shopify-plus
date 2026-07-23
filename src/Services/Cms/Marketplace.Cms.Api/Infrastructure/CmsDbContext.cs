@@ -1,3 +1,4 @@
+using Marketplace.BuildingBlocks.Auditing;
 using Marketplace.BuildingBlocks.Domain;
 using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.Cms.Api.Domain;
@@ -97,6 +98,8 @@ public class CmsDbContext : DbContext
             e.HasIndex(x => new { x.TenantId, x.Version }).IsUnique();
             e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
         });
+
+        modelBuilder.AddAuditLog(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId, "cms");
 
         base.OnModelCreating(modelBuilder);
     }

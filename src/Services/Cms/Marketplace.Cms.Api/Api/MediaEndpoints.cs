@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Marketplace.BuildingBlocks.Auditing;
 using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.BuildingBlocks.Web;
 using Marketplace.Cms.Api.Domain;
@@ -25,7 +26,8 @@ public static class MediaEndpoints
         var group = app.MapGroup("/api/media").WithTags("Media");
 
         group.MapPost("/", async (HttpRequest request, ClaimsPrincipal user, ITenantContext tenant,
-            IMediaStorage storage, CmsDbContext db, IConfiguration config, CancellationToken ct) =>
+            IMediaStorage storage, CmsDbContext db, IConfiguration config, IAuditLogger audit,
+            CancellationToken ct) =>
         {
             if (tenant.TenantId is not { } tenantId)
                 return Results.Problem("Mağaza kapsamı yok.", statusCode: StatusCodes.Status401Unauthorized, title: "tenant.missing");
@@ -60,6 +62,8 @@ public static class MediaEndpoints
                 UploadedBy = user.FindFirstValue("preferred_username") ?? user.FindFirstValue("sub")
             };
             db.MediaAssets.Add(asset);
+            audit.Record("media.upload", $"'{asset.FileName}' görseli yüklendi ({asset.SizeBytes} bayt)",
+                "MediaAsset", asset.Id.ToString());
             await db.SaveChangesAsync(ct);
 
             return Results.Created($"/api/media/{asset.Id}", ToDto(asset));

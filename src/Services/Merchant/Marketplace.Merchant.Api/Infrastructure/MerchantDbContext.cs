@@ -1,3 +1,4 @@
+using Marketplace.BuildingBlocks.Auditing;
 using Marketplace.BuildingBlocks.Domain;
 using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.BuildingBlocks.Outbox;
@@ -43,6 +44,8 @@ public class MerchantDbContext : DbContext
         });
 
         modelBuilder.AddOutboxMessage("merchant");
+
+        modelBuilder.AddAuditLog(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId, "merchant");
 
         base.OnModelCreating(modelBuilder);
     }

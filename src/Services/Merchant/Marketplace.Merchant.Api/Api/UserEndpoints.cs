@@ -1,6 +1,8 @@
+using Marketplace.BuildingBlocks.Auditing;
 using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.BuildingBlocks.Web;
 using Marketplace.Merchant.Api.Identity;
+using Marketplace.Merchant.Api.Infrastructure;
 
 namespace Marketplace.Merchant.Api.Api;
 
@@ -37,7 +39,7 @@ public static class UserEndpoints
         });
 
         group.MapPost("/", async (InviteUserRequest req, ITenantContext tenant,
-            IKeycloakAdminClient admin, CancellationToken ct) =>
+            IKeycloakAdminClient admin, IAuditLogger audit, MerchantDbContext db, CancellationToken ct) =>
         {
             if (tenant.TenantId is not { } storeId) return NoStoreScope();
             if (string.IsNullOrWhiteSpace(req.Username))
@@ -51,6 +53,11 @@ public static class UserEndpoints
                 var created = await admin.CreateStoreUserAsync(storeId,
                     new CreatePanelUser(req.Username.Trim(), req.Email, req.FirstName, req.LastName,
                         req.Role, req.TemporaryPassword, PasswordIsTemporary: true), ct);
+
+                audit.Record("user.invited", $"'{created.Username}' kullanıcısı '{req.Role}' rolüyle eklendi",
+                    "User", created.Id);
+                await db.SaveChangesAsync(ct);
+
                 return Results.Created($"/api/users/{created.Id}", created);
             }
             catch (InvalidOperationException ex)
@@ -60,7 +67,7 @@ public static class UserEndpoints
         });
 
         group.MapPut("/{userId}/role", async (string userId, SetRoleRequest req, ITenantContext tenant,
-            IKeycloakAdminClient admin, CancellationToken ct) =>
+            IKeycloakAdminClient admin, IAuditLogger audit, MerchantDbContext db, CancellationToken ct) =>
         {
             var check = await EnsureUserInStoreAsync(userId, tenant, admin, ct);
             if (check is not null) return check;
@@ -68,7 +75,11 @@ public static class UserEndpoints
             try
             {
                 await admin.SetRoleAsync(userId, req.Role, ct);
-                return Results.Ok(await admin.GetUserAsync(userId, ct));
+                var updated = await admin.GetUserAsync(userId, ct);
+                audit.Record("user.role_changed", $"'{updated?.Username}' kullanıcısının rolü '{req.Role}' olarak değiştirildi",
+                    "User", userId);
+                await db.SaveChangesAsync(ct);
+                return Results.Ok(updated);
             }
             catch (InvalidOperationException ex)
             {
@@ -77,12 +88,15 @@ public static class UserEndpoints
         });
 
         group.MapPost("/{userId}/deactivate", async (string userId, ITenantContext tenant,
-            IKeycloakAdminClient admin, CancellationToken ct) =>
+            IKeycloakAdminClient admin, IAuditLogger audit, MerchantDbContext db, CancellationToken ct) =>
         {
             var check = await EnsureUserInStoreAsync(userId, tenant, admin, ct);
             if (check is not null) return check;
             await admin.SetEnabledAsync(userId, false, ct);
-            return Results.Ok(await admin.GetUserAsync(userId, ct));
+            var user = await admin.GetUserAsync(userId, ct);
+            audit.Record("user.deactivated", $"'{user?.Username}' kullanıcısı pasifleştirildi", "User", userId);
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(user);
         });
 
         group.MapPost("/{userId}/activate", async (string userId, ITenantContext tenant,

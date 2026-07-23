@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Marketplace.BuildingBlocks.Auditing;
 using Marketplace.BuildingBlocks.Web;
 using Marketplace.Cms.Api.Domain;
 using Marketplace.Cms.Api.Experience;
@@ -31,7 +32,7 @@ public static class ExperienceEndpoints
         });
 
         flagWrite.MapPut("/{key}", async (string key, UpsertFlagRequest req, ClaimsPrincipal user,
-            CmsDbContext db, SnapshotBuilder snapshots, CancellationToken ct) =>
+            CmsDbContext db, SnapshotBuilder snapshots, IAuditLogger audit, CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(key))
                 return Results.Problem("Bayrak anahtarı gerekli.", statusCode: StatusCodes.Status400BadRequest, title: "flag.invalid");
@@ -46,6 +47,9 @@ public static class ExperienceEndpoints
             flag.IsEnabled = req.IsEnabled;
             flag.Value = req.Value;
             flag.Description = req.Description;
+            audit.Record("flag.changed",
+                $"'{flag.Key}' özellik bayrağı {(flag.IsEnabled ? "açıldı" : "kapatıldı")}",
+                "FeatureFlag", flag.Key);
             await db.SaveChangesAsync(ct);
 
             // Bayrak değişikliği de yeni bir yapılandırma sürümü doğurur.

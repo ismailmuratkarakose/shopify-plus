@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Marketplace.BuildingBlocks.Auditing;
 using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.BuildingBlocks.Web;
 using Marketplace.Cms.Api.Components;
@@ -123,10 +124,11 @@ public static class PageEndpoints
             return Results.Ok(await BuildDetailAsync(db, id, ct));
         });
 
-        edit.MapDelete("/{id:guid}", async (Guid id, CmsDbContext db, CancellationToken ct) =>
+        edit.MapDelete("/{id:guid}", async (Guid id, CmsDbContext db, IAuditLogger audit, CancellationToken ct) =>
         {
             var page = await db.Pages.FirstOrDefaultAsync(p => p.Id == id, ct);
             if (page is null) return PageNotFound(id);
+            audit.Record("page.delete", $"'{page.Name}' sayfası silindi", "Page", page.Id.ToString());
             db.Pages.Remove(page);
             await db.SaveChangesAsync(ct);
             return Results.NoContent();
@@ -253,7 +255,8 @@ public static class PageEndpoints
 
         // --- Yayın döngüsü ---
         publish.MapPost("/{id:guid}/publish", async (Guid id, PublishRequest? req, ClaimsPrincipal user,
-            CmsDbContext db, ContentValidator validator, SnapshotBuilder snapshots, CancellationToken ct) =>
+            CmsDbContext db, ContentValidator validator, SnapshotBuilder snapshots,
+            IAuditLogger audit, CancellationToken ct) =>
         {
             var page = await LoadPageAsync(db, id, ct);
             if (page is null) return PageNotFound(id);
@@ -283,6 +286,11 @@ public static class PageEndpoints
             draft.PublishedBy = user.FindFirstValue("preferred_username") ?? user.FindFirstValue("sub") ?? "bilinmiyor";
             draft.Note = req?.Note;
             page.PublishedVersionId = draft.Id;
+
+            audit.Record("page.publish",
+                $"'{page.Name}' sayfası {draft.VersionNumber}. sürüm olarak yayınlandı" +
+                (string.IsNullOrWhiteSpace(req?.Note) ? "" : $" — not: {req!.Note}"),
+                "Page", page.Id.ToString());
 
             await db.SaveChangesAsync(ct);
 
@@ -334,7 +342,7 @@ public static class PageEndpoints
 
         // Geri alma: seçilen sürümün içeriği yeni bir taslağa kopyalanır (yayın etkilenmez).
         publish.MapPost("/{id:guid}/versions/{versionId:guid}/restore", async (
-            Guid id, Guid versionId, CmsDbContext db, CancellationToken ct) =>
+            Guid id, Guid versionId, CmsDbContext db, IAuditLogger audit, CancellationToken ct) =>
         {
             var page = await LoadPageAsync(db, id, ct);
             if (page is null) return PageNotFound(id);
@@ -363,6 +371,9 @@ public static class PageEndpoints
 
             draft.Note = $"{source.VersionNumber}. sürümden geri yüklendi";
             CloneComponents(db, source, draft);
+            audit.Record("page.restore",
+                $"'{page.Name}' sayfası {source.VersionNumber}. sürümden taslağa geri yüklendi",
+                "Page", page.Id.ToString());
 
             await db.SaveChangesAsync(ct);
             return Results.Ok(await BuildDetailAsync(db, id, ct));
