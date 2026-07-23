@@ -67,12 +67,62 @@ Shopify'dan gelen stok, senkron kaynağı olarak Inventory'yi besler.
 düzeltmeyi YANSITMIYOR (kullanıcı o an güncelleme istememişti) — müşteriye gönderilmeden önce
 revize edilmeli.
 
-**AÇIK KALAN YAPISAL SORU — kiracılık (tenant) modeli:** Tek bir pazaryeri mi (kiracı = pazaryeri,
-mağazalar alt varlık; tek mobil uygulama; CMS içeriğini pazaryeri yönetir), yoksa platform birden
-çok pazaryerine SaaS olarak mı satılacak? Mevcut kodda `TenantId` = mağaza; tek-pazaryeri modelinde
-CMS içeriği **platform seviyesinde** olmalı, mağaza seviyesinde değil. Ayrıca Pivot 1'deki
-**barkod + ürün master/satıcı teklifi** modeli (aynı ürünü N mağaza farklı fiyattan satar) geri
-gelecek mi? Katalog refactor'ü bu iki cevaba bağlı.
+**KARAR — Kiracılık: TEK PAZARYERİ.** Kiracı = pazaryerinin kendisi; mağazalar **alt varlıktır**.
+Tek mobil uygulama vardır. CMS içeriğini pazaryerinin kendi içerik yöneticileri yönetir (mağazalar değil).
+
+**KARAR — Ürün modeli: BARKOD MASTER + SATICI TEKLİFİ.** Ortak ürün kartı barkodla eşleşir; her
+mağaza kendi fiyat/stok teklifini açar. Müşteri tek ürün sayfasında satıcıları karşılaştırır
+(Trendyol/Hepsiburada modeli). Excel içeri aktarımda **barkod zorunlu alandır**; Shopify senkronu da
+barkod üzerinden master'a bağlanır.
+
+### 0.1 Kapsamlama (scoping) modeli — en büyük refactor
+
+Bugün `TenantId` = **mağaza**; global sorgu filtreleri buna göre kurulu. Yeni modelde iki ayrı
+boyut gerekir:
+
+| Boyut | Anlamı | Uygulandığı veri |
+|---|---|---|
+| `TenantId` | **Pazaryeri** (şimdilik tek kayıt) | her şey — SaaS kapısını açık tutar, sonradan göç gerekmez |
+| `StoreId` | **Mağaza** (yeni boyut) | satıcı teklifi, stok, sipariş kalemi, kargo, mağaza kullanıcıları |
+
+- **CMS içeriği** (sayfa, bileşen, sürüm, bayrak, medya): yalnızca `TenantId` → pazaryeri yönetir.
+  *Mevcut kodda mağaza bazlı; bu değişmeli.*
+- **Ürün master** (barkod): yalnızca `TenantId` → ortak katalog.
+- **Satıcı teklifi / stok / sipariş kalemi / kargo**: `TenantId` + `StoreId`.
+- Mağaza kullanıcısı yalnızca kendi `StoreId`'sini görür; pazaryeri personeli hepsini görür.
+  Faz J'de yazılan **`X-Acting-Store`** başlığı bu modelde tam yerine oturur: pazaryeri personeli
+  bir mağaza adına işlem yapar.
+
+**Üç kullanıcı tipinin karşılığı:**
+1. **Müşteri** — pazaryerinin kendi kimliği (üye ol/giriş/misafir); mağaza kapsamı yok. *(yeni)*
+2. **Pazaryeri personeli** — `owner`, `platform-admin`, `content-editor`, `publish-manager`.
+   *Mevcut kodda içerik rolleri mağaza bazlı; platform seviyesine taşınmalı.*
+3. **Mağaza kullanıcıları** — `store-admin` + alt roller; `StoreId` ile sınırlı.
+
+### 0.2 Revize yol haritası
+
+Bağımlılık sırasıyla (⟳ = geri getirilecek, git `6e28646^`):
+
+| # | İş | Durum | ~Efor |
+|---|---|---|---|
+| R1 | Kapsamlama refactor'ü: `TenantId`=pazaryeri, `StoreId` boyutu; CMS ve içerik rollerini platform seviyesine taşı | yeni | 10–14 |
+| R2 | **Katalog servisi**: ürün master (barkod) + kategori ağacı + satıcı teklifi | ⟳ uyarla | 18–22 |
+| R3 | Manuel ürün/kategori CRUD + **Excel/CSV içeri aktarım** (doğrulama + hata raporu) | yeni | 12–15 |
+| R4 | Shopify senkronunu katalog **besleyicisine** çevir (barkod eşleme, `Source`) | uyarla | 8 |
+| R5 | Müşteri kimliği (üye ol/giriş/misafir sepeti) — D-10 yeniden yazımı | yeni | 12 |
+| R6 | Sepet (BFF/Redis'ten Mobil API'ye taşı, teklif bazlı) | ⟳ uyarla | 8 |
+| R7 | Stok + rezervasyon (teklif seviyesinde; Shopify stok besler) | ⟳ uyarla | 10 |
+| R8 | Sipariş: tek ödeme → mağaza başına sipariş bölme | ⟳ uyarla | 15 |
+| R9 | **iyzico Pazaryeri**: submerchant kaydı + KYC onboarding + kalem bazlı ödeme | ⟳ yeniden tasarla | 22–26 |
+| R10 | Komisyon, hakediş, ödeme aktarımı, mutabakat raporu | ⟳ uyarla | 15 |
+| R11 | Kargo yönetimi (mağaza başına taşıyıcı, gönderi takibi) | yeni | 14 |
+
+Sonrasında mevcut plandaki deneyim fazları (E banner/popup, F tema, G kişiselleştirme,
+H push, I çoklu dil, K analitik, L 3. parti, N K8s) devam eder.
+
+**Efor etkisi:** çekirdek **311 → ~430–460 adam-gün**. Excel görev listesi ve Word teklif dosyası
+bu modeli yansıtmıyor; müşteriye gönderilmeden önce **yeniden üretilmeli**.
+
 
 ## 1. Ürün şekli farkı (kritik)
 
