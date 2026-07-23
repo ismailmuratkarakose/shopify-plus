@@ -3,6 +3,7 @@ using System;
 using Marketplace.Merchant.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Marketplace.Merchant.Api.Infrastructure.Migrations
 {
     [DbContext(typeof(MerchantDbContext))]
-    partial class MerchantDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260723135003_R1StoreScope")]
+    partial class R1StoreScope
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

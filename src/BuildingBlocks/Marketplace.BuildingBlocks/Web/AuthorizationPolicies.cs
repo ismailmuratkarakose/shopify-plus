@@ -9,13 +9,15 @@ public static class Roles
     public const string Owner = "owner";
     public const string PlatformAdmin = "platform-admin";
 
-    // --- Mağaza seviyesi ---
-    /// <summary>Mağaza yöneticisi: mağaza ayarları, kullanıcı yönetimi ve tüm içerik işlemleri.</summary>
-    public const string StoreAdmin = "store-admin";
+    // --- Pazaryeri içerik ekibi (platform personeli) ---
     /// <summary>Yayın yöneticisi: içeriği onaylar, yayınlar, yayından kaldırır, sürüm yönetir.</summary>
     public const string PublishManager = "publish-manager";
     /// <summary>İçerik editörü: içerik hazırlar/düzenler ama YAYINLAYAMAZ.</summary>
     public const string ContentEditor = "content-editor";
+
+    // --- Mağaza seviyesi ---
+    /// <summary>Mağaza yöneticisi: mağaza ayarları, kullanıcı yönetimi, ürün/sipariş/kargo işlemleri.</summary>
+    public const string StoreAdmin = "store-admin";
 
     /// <summary>Eski rol adı; mağaza yöneticisiyle eşdeğer kabul edilir (geriye uyum).</summary>
     public const string Merchant = "merchant";
@@ -43,8 +45,10 @@ public static class Policies
 public static class AuthorizationPolicyExtensions
 {
     /// <summary>
-    /// Tüm servislerde ortak izin matrisi. Üst roller alt rollerin yetkilerini kapsar:
-    /// içerik editörü ⊂ yayın yöneticisi ⊂ mağaza yöneticisi ⊂ platform.
+    /// Tüm servislerde ortak izin matrisi (R1'de ayrıştı):
+    /// - İçerik hattı PAZARYERİNİNDİR — mobil uygulama tektir, içeriğini pazaryerinin kendi
+    ///   içerik ekibi yönetir: editör ⊂ yayın yöneticisi ⊂ platform. Mağaza rolleri DIŞINDADIR.
+    /// - Mağaza hattı: mağaza yöneticisi kendi mağazasını yönetir; platform hepsini kapsar.
     /// </summary>
     public static IServiceCollection AddMarketplacePolicies(this IServiceCollection services)
     {
@@ -54,9 +58,9 @@ public static class AuthorizationPolicyExtensions
         services.AddAuthorizationBuilder()
             .AddPolicy(Policies.Owner, p => p.RequireRole(platform))
             .AddPolicy(Policies.StoreManage, p => p.RequireRole([.. storeAdmins, .. platform]))
-            .AddPolicy(Policies.ContentPublish, p => p.RequireRole([Roles.PublishManager, .. storeAdmins, .. platform]))
+            .AddPolicy(Policies.ContentPublish, p => p.RequireRole([Roles.PublishManager, .. platform]))
             .AddPolicy(Policies.ContentEdit, p => p.RequireRole(
-                [Roles.ContentEditor, Roles.PublishManager, .. storeAdmins, .. platform]));
+                [Roles.ContentEditor, Roles.PublishManager, .. platform]));
 
         return services;
     }

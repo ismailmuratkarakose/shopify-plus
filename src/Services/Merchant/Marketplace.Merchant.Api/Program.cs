@@ -18,7 +18,7 @@ builder.Services.AddMarketplaceOpenApi();
 
 // --- Multi-tenancy ---
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ITenantContext, TenantContext>();
+builder.Services.AddScoped<IStoreContext, StoreContext>();
 
 // --- EF Core / PostgreSQL ---
 builder.Services.AddDbContext<MerchantDbContext>(opt =>
@@ -87,7 +87,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseRateLimiter();
 app.UseAuthentication();
-app.UseTenantResolution();
+app.UseStoreResolution();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");

@@ -17,7 +17,7 @@ public record StoreSignupRequest(
 /// Mağaza self-service kaydı. ANONİM bir uçtur (henüz hesap yoktur) — bu nedenle hız sınırına tabidir.
 ///
 /// Akış: kullanıcı adı/e-posta müsaitlik kontrolü → mağaza kaydı (Pending) → Keycloak'ta
-/// mağaza yöneticisi kullanıcısı (tenant_id ile). İki ayrı sistem yazıldığı için ikinci adım
+/// mağaza yöneticisi kullanıcısı (store_id ile). İki ayrı sistem yazıldığı için ikinci adım
 /// başarısız olursa ilk adım TELAFİ edilir; yarım kalmış mağaza bırakılmaz.
 ///
 /// Komisyon oranını mağaza kendisi belirleyemez; platform varsayılanı uygulanır.
@@ -67,7 +67,7 @@ public static class SignupEndpoints
             db.Merchants.Add(store);
             db.EnqueueIntegrationEvent(new MerchantRegisteredIntegrationEvent
             {
-                TenantId = store.Id,
+                StoreId = store.Id,
                 MerchantId = store.Id,
                 Name = store.Name,
                 Slug = store.Slug,
@@ -106,7 +106,7 @@ public static class SignupEndpoints
             // Kayıt izini denetim defterine düş (aktör anonimdir; mağaza kimliği açıkça yazılır).
             db.Set<Marketplace.BuildingBlocks.Auditing.AuditEntry>().Add(new Marketplace.BuildingBlocks.Auditing.AuditEntry
             {
-                TenantId = store.Id,
+                StoreId = store.Id,
                 ActorId = "self-service",
                 ActorName = username,
                 Action = "store.signup",

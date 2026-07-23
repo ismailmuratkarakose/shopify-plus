@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Marketplace.BuildingBlocks.Auditing;
-using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.BuildingBlocks.Web;
 using Marketplace.Cms.Api.Components;
 using Marketplace.Cms.Api.Domain;
@@ -40,7 +39,9 @@ public static class PageEndpoints
     public static IEndpointRouteBuilder MapPageEndpoints(this IEndpointRouteBuilder app)
     {
         // Okuma herkese (kimlik doğrulanmış), hazırlama içerik editörüne, canlıya alma yayın yöneticisine.
-        var group = app.MapGroup("/api/pages").RequireAuthorization().WithTags("Pages");
+        // Okuma dahil tüm sayfa yönetimi pazaryeri içerik ekibinindir (R1) —
+        // mağaza rolleri içeriği yalnızca yayınlanmış deneyim üzerinden görür.
+        var group = app.MapGroup("/api/pages").RequireAuthorization(Policies.ContentEdit).WithTags("Pages");
         var edit = app.MapGroup("/api/pages").RequireAuthorization(Policies.ContentEdit).WithTags("Pages");
         var publish = app.MapGroup("/api/pages").RequireAuthorization(Policies.ContentPublish).WithTags("Pages");
 
@@ -302,18 +303,14 @@ public static class PageEndpoints
         });
 
         // --- Önizleme kanalı: yayınlanmamış taslağı test cihazında görmek için süreli anahtar ---
-        edit.MapPost("/{id:guid}/preview-token", async (Guid id, ClaimsPrincipal user, ITenantContext tenant,
+        edit.MapPost("/{id:guid}/preview-token", async (Guid id, ClaimsPrincipal user,
             CmsDbContext db, IConfiguration config, CancellationToken ct, int? expiresInMinutes = null) =>
         {
             var page = await db.Pages.FirstOrDefaultAsync(p => p.Id == id, ct);
             if (page is null) return PageNotFound(id);
-            if (tenant.TenantId is not { } tenantId)
-                return Problem("Mağaza kapsamı yok.", StatusCodes.Status401Unauthorized, "tenant.missing");
-
             var minutes = Math.Clamp(expiresInMinutes ?? config.GetValue<int?>("Preview:DefaultExpiryMinutes") ?? 60, 5, 1440);
             var token = new PreviewToken
             {
-                TenantId = tenantId,
                 PageId = page.Id,
                 Token = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24)).ToLowerInvariant(),
                 ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(minutes),

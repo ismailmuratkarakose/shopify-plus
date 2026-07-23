@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using Marketplace.Mobile.Api.Clients;
 
@@ -13,16 +12,17 @@ public sealed class CachedSnapshot
 }
 
 /// <summary>
-/// Mağaza başına deneyim anlık görüntüsü önbelleği. Mobil trafiği her istekte CMS'e gitmez;
-/// TTL dolduğunda ETag ile yeniden doğrulama yapılır (değişmemişse 304 → gövde indirilmez).
+/// Pazaryeri deneyim anlık görüntüsü önbelleği (R1: içerik pazaryeri seviyesinde → tek girdi).
+/// Mobil trafiği her istekte CMS'e gitmez; TTL dolduğunda ETag ile yeniden doğrulama yapılır
+/// (değişmemişse 304 → gövde indirilmez).
 /// </summary>
 public sealed class ExperienceCache
 {
-    private readonly ConcurrentDictionary<Guid, CachedSnapshot> _entries = new();
+    private volatile CachedSnapshot? _entry;
 
-    public bool TryGet(Guid tenantId, out CachedSnapshot? entry) => _entries.TryGetValue(tenantId, out entry);
-    public void Set(Guid tenantId, CachedSnapshot entry) => _entries[tenantId] = entry;
-    public void Invalidate(Guid tenantId) => _entries.TryRemove(tenantId, out _);
+    public bool TryGet(out CachedSnapshot? entry) { entry = _entry; return entry is not null; }
+    public void Set(CachedSnapshot entry) => _entry = entry;
+    public void Invalidate() => _entry = null;
 }
 
 /// <summary>Snapshot'ı önbellekten veya CMS'ten getirir ve ekran/bayrak sorgularını yanıtlar.</summary>
@@ -34,9 +34,9 @@ public sealed class ExperienceService(
 {
     private TimeSpan Ttl => TimeSpan.FromSeconds(config.GetValue<int?>("Experience:CacheTtlSeconds") ?? 30);
 
-    public async Task<CachedSnapshot?> GetAsync(Guid tenantId, CancellationToken ct)
+    public async Task<CachedSnapshot?> GetAsync(CancellationToken ct)
     {
-        cache.TryGet(tenantId, out var entry);
+        cache.TryGet(out var entry);
         var fresh = entry is not null && DateTimeOffset.UtcNow - entry.FetchedAt < Ttl;
         if (fresh) return entry;
 
@@ -47,7 +47,7 @@ public sealed class ExperienceService(
         {
             if (entry is not null)
             {
-                logger.LogWarning("Deneyim güncellenemedi; önbellekteki sürüm kullanılıyor (mağaza {Tenant}).", tenantId);
+                logger.LogWarning("Deneyim güncellenemedi; önbellekteki sürüm kullanılıyor.");
                 entry.FetchedAt = DateTimeOffset.UtcNow;
                 return entry;
             }
@@ -71,7 +71,7 @@ public sealed class ExperienceService(
             Version = version,
             FetchedAt = DateTimeOffset.UtcNow
         };
-        cache.Set(tenantId, updated);
+        cache.Set(updated);
         return updated;
     }
 

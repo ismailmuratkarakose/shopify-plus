@@ -1,9 +1,9 @@
 namespace Marketplace.BuildingBlocks.Domain;
 
-/// <summary>Merchant'a ait (tenant izolasyonuna tabi) her kayıt bunu uygular.</summary>
-public interface ITenantOwned
+/// <summary>Bir mağazaya ait (mağaza izolasyonuna tabi) her kayıt bunu uygular.</summary>
+public interface IStoreOwned
 {
-    Guid TenantId { get; set; }
+    Guid StoreId { get; set; }
 }
 
 /// <summary>Oluşturma/güncelleme denetim alanları.</summary>
@@ -13,11 +13,19 @@ public interface IAuditable
     DateTimeOffset? UpdatedAt { get; set; }
 }
 
-/// <summary>Merchant'a ait denetlenebilir entity'ler için ortak taban.</summary>
-public abstract class AuditableTenantEntity : ITenantOwned, IAuditable
+/// <summary>
+/// Pazaryeri (platform) seviyesindeki denetlenebilir entity'ler için taban — mağaza boyutu YOKTUR.
+/// CMS içeriği, ürün master'ı gibi pazaryerinin bütününe ait veriler bunu kullanır.
+/// </summary>
+public abstract class AuditableEntity : IAuditable
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid TenantId { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? UpdatedAt { get; set; }
+}
+
+/// <summary>Bir mağazaya ait denetlenebilir entity'ler için ortak taban.</summary>
+public abstract class AuditableStoreEntity : AuditableEntity, IStoreOwned
+{
+    public Guid StoreId { get; set; }
 }

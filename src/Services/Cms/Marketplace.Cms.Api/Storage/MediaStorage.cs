@@ -6,7 +6,7 @@ namespace Marketplace.Cms.Api.Storage;
 /// </summary>
 public interface IMediaStorage
 {
-    Task<string> SaveAsync(Stream content, Guid tenantId, string fileName, CancellationToken ct);
+    Task<string> SaveAsync(Stream content, string fileName, CancellationToken ct);
     Task<Stream?> OpenAsync(string storagePath, CancellationToken ct);
     Task DeleteAsync(string storagePath, CancellationToken ct);
 }
@@ -23,14 +23,14 @@ public sealed class LocalFileMediaStorage : IMediaStorage
         Directory.CreateDirectory(_root);
     }
 
-    public async Task<string> SaveAsync(Stream content, Guid tenantId, string fileName, CancellationToken ct)
+    public async Task<string> SaveAsync(Stream content, string fileName, CancellationToken ct)
     {
-        // Mağaza başına klasör; dosya adı çakışmasın diye benzersiz önek.
+        // Ay bazlı klasör; dosya adı çakışmasın diye benzersiz önek.
         var safeName = Path.GetFileName(fileName);
         foreach (var c in Path.GetInvalidFileNameChars())
             safeName = safeName.Replace(c, '_');
 
-        var relativeDir = tenantId.ToString();
+        var relativeDir = DateTimeOffset.UtcNow.ToString("yyyy-MM");
         var relativePath = Path.Combine(relativeDir, $"{Guid.NewGuid():N}_{safeName}");
         var fullDir = Path.Combine(_root, relativeDir);
         Directory.CreateDirectory(fullDir);

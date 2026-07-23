@@ -41,16 +41,16 @@ public static class MobileEndpoints
     // --- Uzaktan yapılandırma / ekran deneyimi ---
     private static void MapExperience(RouteGroupBuilder api)
     {
-        var group = api.MapGroup("/experience").WithTags("Mobile.Experience");
+        // Yayınlanan deneyim kamusaldır: giriş yapmamış pazaryeri müşterisi de uygulamayı açabilmeli.
+        // (Katalog uçları R2'de ortak kataloğa geçince onlar da anonim olacak.)
+        var group = api.MapGroup("/experience").WithTags("Mobile.Experience").AllowAnonymous();
 
-        group.MapGet("/{screen}", async (string screen, HttpContext http, ITenantContext tenant,
+        group.MapGet("/{screen}", async (string screen, HttpContext http,
             ExperienceService experience, CancellationToken ct) =>
         {
-            if (tenant.TenantId is not { } tenantId) return Unauthorized();
-
-            var snap = await experience.GetAsync(tenantId, ct);
+            var snap = await experience.GetAsync(ct);
             if (snap is null)
-                return Results.Problem("Bu mağaza için yayınlanmış içerik yok.",
+                return Results.Problem("Henüz yayınlanmış içerik yok.",
                     statusCode: StatusCodes.Status404NotFound, title: "experience.not_published");
 
             var page = ExperienceService.ResolveScreen(snap.Root, screen);
@@ -75,12 +75,11 @@ public static class MobileEndpoints
         });
 
         // Bayraklar + sürüm: uygulama açılışında tek çağrı.
-        group.MapGet("/", async (HttpContext http, ITenantContext tenant, ExperienceService experience, CancellationToken ct) =>
+        group.MapGet("/", async (HttpContext http, ExperienceService experience, CancellationToken ct) =>
         {
-            if (tenant.TenantId is not { } tenantId) return Unauthorized();
-            var snap = await experience.GetAsync(tenantId, ct);
+            var snap = await experience.GetAsync(ct);
             if (snap is null)
-                return Results.Problem("Bu mağaza için yayınlanmış içerik yok.",
+                return Results.Problem("Henüz yayınlanmış içerik yok.",
                     statusCode: StatusCodes.Status404NotFound, title: "experience.not_published");
 
             var screens = (snap.Root["pages"] as JsonArray)?
@@ -142,7 +141,7 @@ public static class MobileEndpoints
             return Results.Ok(new { total, page = p2, pageSize = size, items });
         });
 
-        group.MapGet("/{productId:long}", async (long productId, ClaimsPrincipal user, ITenantContext tenant,
+        group.MapGet("/{productId:long}", async (long productId, ClaimsPrincipal user, IStoreContext scope,
             IStoreClient store, MobileDbContext db, CancellationToken ct) =>
         {
             var p = await store.GetProductAsync(productId, ct);
@@ -151,8 +150,8 @@ public static class MobileEndpoints
                     title: "product.not_found");
 
             // Ürün detayı görüntülendi → "son gezilenler" listesine yaz (kişiselleştirmeyi besler).
-            if (tenant.TenantId is { } tenantId)
-                await RecordViewAsync(db, tenantId, UserOf(user), productId, ct);
+            if (scope.StoreId is { } storeId)
+                await RecordViewAsync(db, storeId, UserOf(user), productId, ct);
 
             return Results.Ok(ToDetailDto(p));
         });
@@ -195,15 +194,15 @@ public static class MobileEndpoints
             return Results.Ok(items);
         });
 
-        fav.MapPost("/", async (FavoriteRequest req, ClaimsPrincipal user, ITenantContext tenant,
+        fav.MapPost("/", async (FavoriteRequest req, ClaimsPrincipal user, IStoreContext scope,
             MobileDbContext db, CancellationToken ct) =>
         {
-            if (tenant.TenantId is not { } tenantId) return Unauthorized();
+            if (scope.StoreId is not { } storeId) return Unauthorized();
             var userRef = UserOf(user);
             var exists = await db.Favorites.AnyAsync(f => f.UserRef == userRef && f.ShopifyProductId == req.ProductId, ct);
             if (!exists)
             {
-                db.Favorites.Add(new FavoriteProduct { TenantId = tenantId, UserRef = userRef, ShopifyProductId = req.ProductId });
+                db.Favorites.Add(new FavoriteProduct { StoreId = storeId, UserRef = userRef, ShopifyProductId = req.ProductId });
                 await db.SaveChangesAsync(ct);
             }
             return Results.Ok(new { added = true, req.ProductId });
@@ -266,15 +265,15 @@ public static class MobileEndpoints
         user.FindFirstValue("sub") ?? user.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonim";
 
     private static IResult Unauthorized() =>
-        Results.Problem("Mağaza kapsamı yok.", statusCode: StatusCodes.Status401Unauthorized, title: "tenant.missing");
+        Results.Problem("Mağaza kapsamı yok.", statusCode: StatusCodes.Status401Unauthorized, title: "store.missing");
 
     private static decimal MinPrice(StoreProduct p) => p.Variants.Count == 0 ? 0 : p.Variants.Min(v => v.Price);
 
-    private static async Task RecordViewAsync(MobileDbContext db, Guid tenantId, string userRef, long productId, CancellationToken ct)
+    private static async Task RecordViewAsync(MobileDbContext db, Guid storeId, string userRef, long productId, CancellationToken ct)
     {
         var row = await db.RecentlyViewed.FirstOrDefaultAsync(r => r.UserRef == userRef && r.ShopifyProductId == productId, ct);
         if (row is null)
-            db.RecentlyViewed.Add(new RecentlyViewedProduct { TenantId = tenantId, UserRef = userRef, ShopifyProductId = productId });
+            db.RecentlyViewed.Add(new RecentlyViewedProduct { StoreId = storeId, UserRef = userRef, ShopifyProductId = productId });
         else
             row.ViewedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);

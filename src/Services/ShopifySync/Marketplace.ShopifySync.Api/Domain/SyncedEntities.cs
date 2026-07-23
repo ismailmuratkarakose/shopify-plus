@@ -6,7 +6,7 @@ namespace Marketplace.ShopifySync.Api.Domain;
 /// Shopify'dan senkronlanan ürün (read-model). Shopify kaynak sistemdir; bu kayıt yalnızca okuma/
 /// gösterim/kişiselleştirme içindir. Tenant = Shopify mağazası.
 /// </summary>
-public class SyncedProduct : AuditableTenantEntity
+public class SyncedProduct : AuditableStoreEntity
 {
     public long ShopifyProductId { get; set; }
     public string Title { get; set; } = default!;
@@ -35,7 +35,7 @@ public class SyncedVariant
 }
 
 /// <summary>Shopify koleksiyonu (read-model) + ürün üyelikleri.</summary>
-public class SyncedCollection : AuditableTenantEntity
+public class SyncedCollection : AuditableStoreEntity
 {
     public long ShopifyCollectionId { get; set; }
     public string Title { get; set; } = default!;
@@ -55,7 +55,7 @@ public class SyncedCollectionProduct
 /// Shopify siparişi (read-model). Checkout/ödeme Shopify'da yürür; burada SALT OKUNUR tutulur
 /// (sipariş geçmişi, analitik, kişiselleştirme).
 /// </summary>
-public class SyncedOrder : AuditableTenantEntity
+public class SyncedOrder : AuditableStoreEntity
 {
     public long ShopifyOrderId { get; set; }
     public string Name { get; set; } = default!;            // ör. #1001
@@ -85,7 +85,7 @@ public class SyncedOrderLine
 }
 
 /// <summary>Shopify indirimi/kampanyası (read-model) — kampanya alanlarına bağlanır.</summary>
-public class SyncedDiscount : AuditableTenantEntity
+public class SyncedDiscount : AuditableStoreEntity
 {
     public long ShopifyDiscountId { get; set; }
     public string Title { get; set; } = default!;
@@ -100,7 +100,7 @@ public class SyncedDiscount : AuditableTenantEntity
 }
 
 /// <summary>Shopify içerik sayfası (read-model) — mobil içerik ekranlarında gösterilir.</summary>
-public class SyncedPage : AuditableTenantEntity
+public class SyncedPage : AuditableStoreEntity
 {
     public long ShopifyPageId { get; set; }
     public string Title { get; set; } = default!;
@@ -114,7 +114,7 @@ public class SyncedPage : AuditableTenantEntity
 /// Mağaza başına senkron durumu: son çalışma zamanı, sonuç sayıları ve varsa hata.
 /// Yönetim panelinde "veriler ne kadar güncel" sorusunu yanıtlar.
 /// </summary>
-public class StoreSyncState : AuditableTenantEntity
+public class StoreSyncState : AuditableStoreEntity
 {
     public DateTimeOffset? LastSyncAt { get; set; }
     public string LastStatus { get; set; } = "never";       // success / failed / never
@@ -131,7 +131,7 @@ public class StoreSyncState : AuditableTenantEntity
 }
 
 /// <summary>Shopify müşterisi (read-model) — segmentasyon ve kişiselleştirme için.</summary>
-public class SyncedCustomer : AuditableTenantEntity
+public class SyncedCustomer : AuditableStoreEntity
 {
     public long ShopifyCustomerId { get; set; }
     public string? Email { get; set; }

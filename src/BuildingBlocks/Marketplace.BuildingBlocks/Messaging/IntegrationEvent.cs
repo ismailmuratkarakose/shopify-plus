@@ -9,6 +9,6 @@ public abstract record IntegrationEvent
     public Guid EventId { get; init; } = Guid.NewGuid();
     public DateTimeOffset OccurredOn { get; init; } = DateTimeOffset.UtcNow;
 
-    /// <summary>Olayı üreten merchant. Tüketici tarafında tenant korelasyonu için.</summary>
-    public Guid? TenantId { get; init; }
+    /// <summary>Olayla ilgili mağaza (varsa). Tüketici tarafında mağaza korelasyonu için.</summary>
+    public Guid? StoreId { get; init; }
 }

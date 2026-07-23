@@ -23,13 +23,13 @@ public interface IAuditLogger
 public sealed class AuditLogger<TContext> : IAuditLogger where TContext : DbContext
 {
     private readonly TContext _db;
-    private readonly ITenantContext _tenant;
+    private readonly IStoreContext _scope;
     private readonly IHttpContextAccessor _accessor;
 
-    public AuditLogger(TContext db, ITenantContext tenant, IHttpContextAccessor accessor)
+    public AuditLogger(TContext db, IStoreContext scope, IHttpContextAccessor accessor)
     {
         _db = db;
-        _tenant = tenant;
+        _scope = scope;
         _accessor = accessor;
     }
 
@@ -40,11 +40,11 @@ public sealed class AuditLogger<TContext> : IAuditLogger where TContext : DbCont
 
         // Platform personeli bir mağaza adına mı çalışıyor? (X-Acting-Store başlığı)
         var onBehalf = _accessor.HttpContext?.Request.Headers
-            .ContainsKey(TenantResolutionMiddleware.ActingStoreHeader) ?? false;
+            .ContainsKey(StoreResolutionMiddleware.ActingStoreHeader) ?? false;
 
         _db.Set<AuditEntry>().Add(new AuditEntry
         {
-            TenantId = _tenant.TenantId,
+            StoreId = _scope.StoreId,
             ActorId = user?.FindFirstValue("sub") ?? "sistem",
             ActorName = user?.FindFirstValue("preferred_username") ?? user?.FindFirstValue("sub") ?? "sistem",
             ActorRoles = roles.Length > 0 ? string.Join(",", roles) : null,
@@ -62,20 +62,20 @@ public static class AuditExtensions
     /// <summary>
     /// AuditEntries tablosunu modele ekler. Servisin DbContext'inde OnModelCreating içinde çağrılır.
     /// </summary>
-    /// <param name="tenantFilter">
-    /// Kiracı filtresi. Çağıran, kendi DbContext ALANINI referans alan bir ifade vermelidir
-    /// (ör. <c>x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId</c>).
-    /// DİKKAT: ITenantContext'i parametre olarak alıp closure'da yakalamak YANLIŞTIR — model bir kez
-    /// kurulup önbelleğe alındığından ilk isteğin tenant nesnesi donar ve filtre sonraki isteklerde
+    /// <param name="storeFilter">
+    /// Mağaza filtresi. Çağıran, kendi DbContext ALANINI referans alan bir ifade vermelidir
+    /// (ör. <c>x => _scope.IsPlatformScope || x.StoreId == _scope.StoreId</c>).
+    /// DİKKAT: IStoreContext'i parametre olarak alıp closure'da yakalamak YANLIŞTIR — model bir kez
+    /// kurulup önbelleğe alındığından ilk isteğin scope nesnesi donar ve filtre sonraki isteklerde
     /// yanlış çalışır. DbContext alanı referans edildiğinde EF her sorguda yeniden değerlendirir.
     /// </param>
     public static void AddAuditLog(this ModelBuilder modelBuilder,
-        System.Linq.Expressions.Expression<Func<AuditEntry, bool>> tenantFilter, string? schema = null)
+        System.Linq.Expressions.Expression<Func<AuditEntry, bool>> storeFilter, string? schema = null)
     {
         modelBuilder.Entity<AuditEntry>(e =>
         {
             e.ToTable("AuditEntries", schema);
-            e.HasQueryFilter(tenantFilter);
+            e.HasQueryFilter(storeFilter);
             e.HasKey(x => x.Id);
             e.Property(x => x.ActorId).HasMaxLength(200).IsRequired();
             e.Property(x => x.ActorName).HasMaxLength(200).IsRequired();
@@ -85,7 +85,7 @@ public static class AuditExtensions
             e.Property(x => x.EntityId).HasMaxLength(100);
             e.Property(x => x.Summary).HasMaxLength(1000).IsRequired();
             // Mağaza bazlı, zamana göre azalan listeleme en sık sorgudur.
-            e.HasIndex(x => new { x.TenantId, x.OccurredAt });
+            e.HasIndex(x => new { x.StoreId, x.OccurredAt });
             e.HasIndex(x => x.Action);
         });
     }

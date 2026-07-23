@@ -6,13 +6,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Marketplace.Cms.Api.Infrastructure;
 
+/// <summary>
+/// CMS içeriği PAZARYERİ SEVİYESİNDEDİR (R1): sayfalar, bayraklar, medya ve snapshot'lar
+/// pazaryerinin bütününe aittir; mağaza boyutu taşımaz. Tek istisna denetim kaydıdır —
+/// platform personeli X-Acting-Store ile bir mağaza adına işlem yaptığında StoreId dolar.
+/// </summary>
 public class CmsDbContext : DbContext
 {
-    private readonly ITenantContext _tenant;
+    private readonly IStoreContext _scope;
 
-    public CmsDbContext(DbContextOptions<CmsDbContext> options, ITenantContext tenant)
+    public CmsDbContext(DbContextOptions<CmsDbContext> options, IStoreContext scope)
         : base(options)
-        => _tenant = tenant;
+        => _scope = scope;
 
     public DbSet<Page> Pages => Set<Page>();
     public DbSet<PageVersion> PageVersions => Set<PageVersion>();
@@ -32,10 +37,9 @@ public class CmsDbContext : DbContext
             e.Property(x => x.Name).HasMaxLength(300).IsRequired();
             e.Property(x => x.Handle).HasMaxLength(200).IsRequired();
             e.Property(x => x.ScreenType).HasConversion<string>().HasMaxLength(30);
-            e.HasIndex(x => new { x.TenantId, x.Handle }).IsUnique();
-            e.HasIndex(x => new { x.TenantId, x.ScreenType });
+            e.HasIndex(x => x.Handle).IsUnique();
+            e.HasIndex(x => x.ScreenType);
             e.HasMany(x => x.Versions).WithOne().HasForeignKey(v => v.PageId).OnDelete(DeleteBehavior.Cascade);
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
         });
 
         modelBuilder.Entity<PageVersion>(e =>
@@ -46,7 +50,6 @@ public class CmsDbContext : DbContext
             e.Property(x => x.Note).HasMaxLength(500);
             e.HasIndex(x => new { x.PageId, x.VersionNumber }).IsUnique();
             e.HasMany(x => x.Components).WithOne().HasForeignKey(c => c.PageVersionId).OnDelete(DeleteBehavior.Cascade);
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
         });
 
         modelBuilder.Entity<PageComponent>(e =>
@@ -65,7 +68,6 @@ public class CmsDbContext : DbContext
             e.Property(x => x.CreatedBy).HasMaxLength(200);
             e.HasIndex(x => x.Token).IsUnique();
             e.HasIndex(x => x.PageId);
-            // NOT: önizleme ucu anonimdir; kiracıyı anahtarın kendisi belirler → burada tenant filtresi YOK.
         });
 
         modelBuilder.Entity<MediaAsset>(e =>
@@ -75,8 +77,7 @@ public class CmsDbContext : DbContext
             e.Property(x => x.ContentType).HasMaxLength(100).IsRequired();
             e.Property(x => x.StoragePath).HasMaxLength(500).IsRequired();
             e.Property(x => x.UploadedBy).HasMaxLength(200);
-            e.HasIndex(x => new { x.TenantId, x.CreatedAt });
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+            e.HasIndex(x => x.CreatedAt);
         });
 
         modelBuilder.Entity<FeatureFlag>(e =>
@@ -85,8 +86,7 @@ public class CmsDbContext : DbContext
             e.Property(x => x.Key).HasMaxLength(100).IsRequired();
             e.Property(x => x.Value).HasMaxLength(500);
             e.Property(x => x.Description).HasMaxLength(500);
-            e.HasIndex(x => new { x.TenantId, x.Key }).IsUnique();
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+            e.HasIndex(x => x.Key).IsUnique();
         });
 
         modelBuilder.Entity<ExperienceSnapshot>(e =>
@@ -95,11 +95,10 @@ public class CmsDbContext : DbContext
             e.Property(x => x.Json).HasColumnType("jsonb").IsRequired();
             e.Property(x => x.GeneratedBy).HasMaxLength(200);
             e.Property(x => x.Reason).HasMaxLength(30).IsRequired();
-            e.HasIndex(x => new { x.TenantId, x.Version }).IsUnique();
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+            e.HasIndex(x => x.Version).IsUnique();
         });
 
-        modelBuilder.AddAuditLog(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId, "cms");
+        modelBuilder.AddAuditLog(x => _scope.IsPlatformScope || x.StoreId == _scope.StoreId, "cms");
 
         base.OnModelCreating(modelBuilder);
     }
@@ -108,10 +107,6 @@ public class CmsDbContext : DbContext
     {
         foreach (var entry in ChangeTracker.Entries())
         {
-            if (entry.Entity is ITenantOwned owned && entry.State == EntityState.Added &&
-                owned.TenantId == Guid.Empty && _tenant.TenantId is { } tid)
-                owned.TenantId = tid;
-
             if (entry.Entity is IAuditable audit && entry.State == EntityState.Modified)
                 audit.UpdatedAt = DateTimeOffset.UtcNow;
         }

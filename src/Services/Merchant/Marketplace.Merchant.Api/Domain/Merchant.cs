@@ -11,7 +11,7 @@ public enum MerchantStatus
 
 /// <summary>
 /// Pazaryerindeki bir satıcı. Merchant.Id aynı zamanda tenant kimliğidir
-/// (JWT'deki tenant_id claim'i bu Id'ye eşlenir).
+/// (JWT'deki store_id claim'i bu Id'ye eşlenir).
 /// </summary>
 public class Merchant : IAuditable
 {

@@ -105,7 +105,7 @@ Bağımlılık sırasıyla (⟳ = geri getirilecek, git `6e28646^`):
 
 | # | İş | Durum | ~Efor |
 |---|---|---|---|
-| R1 | Kapsamlama refactor'ü: `TenantId`=pazaryeri, `StoreId` boyutu; CMS ve içerik rollerini platform seviyesine taşı | yeni | 10–14 |
+| R1 | Kapsamlama refactor'ü: `TenantId`=pazaryeri, `StoreId` boyutu; CMS ve içerik rollerini platform seviyesine taşı | ✅ dilim 1 (2026-07-23) | 10–14 |
 | R2 | **Katalog servisi**: ürün master (barkod) + kategori ağacı + satıcı teklifi | ⟳ uyarla | 18–22 |
 | R3 | Manuel ürün/kategori CRUD + **Excel/CSV içeri aktarım** (doğrulama + hata raporu) | yeni | 12–15 |
 | R4 | Shopify senkronunu katalog **besleyicisine** çevir (barkod eşleme, `Source`) | uyarla | 8 |
@@ -116,6 +116,43 @@ Bağımlılık sırasıyla (⟳ = geri getirilecek, git `6e28646^`):
 | R9 | **iyzico Pazaryeri**: submerchant kaydı + KYC onboarding + kalem bazlı ödeme | ⟳ yeniden tasarla | 22–26 |
 | R10 | Komisyon, hakediş, ödeme aktarımı, mutabakat raporu | ⟳ uyarla | 15 |
 | R11 | Kargo yönetimi (mağaza başına taşıyıcı, gönderi takibi) | yeni | 14 |
+
+
+#### R1 dilim 1 tamamlandı (2026-07-23)
+
+**Yapılan:**
+- **Terminoloji/kapsam:** `ITenantContext` → `IStoreContext` (`StoreId`, `SetStore`); `ITenantOwned` →
+  `IStoreOwned`; `AuditableTenantEntity` → `AuditableStoreEntity` + yeni mağazasız `AuditableEntity`;
+  `TenantResolutionMiddleware` → `StoreResolutionMiddleware`. JWT claim'i `tenant_id` → **`store_id`**
+  (realm mapper + kullanıcı profili + Admin API sorguları + tüm servisler).
+- **CMS içeriği pazaryeri seviyesine indi:** Page/PageVersion/PreviewToken/MediaAsset/FeatureFlag/
+  ExperienceSnapshot artık mağaza kolonu taşımıyor; benzersiz indeksler (handle, flag key, snapshot
+  sürümü) global. Medya klasörü mağaza yerine ay bazlı.
+- **Roller iki hata ayrıldı:** içerik hattı (content-editor ⊂ publish-manager ⊂ platform) ile mağaza
+  hattı (store-admin ⊂ platform). Mağaza rolleri içerik uçlarından TAMAMEN çıkarıldı (okuma dahil).
+  Middleware'de içerik ekibi mağaza claim'i yoksa platform kapsamında okur.
+- **Deneyim kamusal:** CMS `/api/experience/current` ve Mobil `/api/mobile/experience/*` anonim —
+  giriş yapmamış pazaryeri müşterisi uygulamayı açabilir. Önbellek tek girdiye indi.
+- **Denetim:** `AuditEntry.StoreId` null olabilir (platform işlemleri); içerik denetimi
+  `content.publish` politikasına, hesap denetimi `store.manage`e bağlandı (parametreli
+  `MapAuditEndpoints`).
+- Migration'lar: `R1PlatformContent` (CMS) + `R1StoreScope` (Merchant/ShopifySync/Mobile). Dev
+  `.data` sıfırlandı (realm yeniden import → `store_id`).
+
+**Yakalanan güvenlik açığı:** mağaza yöneticisi `/api/users` ile kullanıcısına `content-editor`
+atayabiliyordu → içerik rolleri artık platform yetkisi olduğundan bu, pazaryeri CMS'ine yetki
+sızıntısı olurdu. `AssignableRoles` mağaza-seviyesi rollerle sınırlandı (şimdilik yalnız
+`store-admin`). Smoke doğruladı: içerik rolü atama 400, store-admin daveti 201.
+
+**Bilinçli ARA durumlar:** mobil katalog uçları hâlâ mağaza-kapsamlı ShopifySync read-model'ini
+okuyor ve kimlik istiyor (R2/R4'te ortak kataloğa geçip anonimleşecek); checkout hâlâ Shopify
+permalink üretiyor (R8'de platform checkout'una dönecek); `Merchant` → `Store` toplu tip/rota
+adlandırması kozmetik olarak ertelendi.
+
+**Smoke (smokeR1):** store_id claim ✓, editör 403/yayıncı 200 ✓, merchant içerik 403 (okuma dahil) ✓,
+anonim deneyim 200 + Home çözümü ✓, anonim sayfa yönetimi 401 ✓, içerik rolü sızıntısı 400 ✓,
+audit ayrımı (403/200) + yayın kaydı StoreId=null ✓, X-Acting-Store 200 ✓, Shopify bağla →
+mutabakat senkronu 5 ürün/2 koleksiyon/4 sipariş/3 müşteri/3 indirim/4 sayfa ✓.
 
 Sonrasında mevcut plandaki deneyim fazları (E banner/popup, F tema, G kişiselleştirme,
 H push, I çoklu dil, K analitik, L 3. parti, N K8s) devam eder.

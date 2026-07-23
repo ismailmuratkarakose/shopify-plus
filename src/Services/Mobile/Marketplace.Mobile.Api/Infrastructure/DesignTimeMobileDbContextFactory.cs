@@ -11,8 +11,8 @@ public sealed class DesignTimeMobileDbContextFactory : IDesignTimeDbContextFacto
         var conn = Environment.GetEnvironmentVariable("MOBILE_DB")
                    ?? "Host=localhost;Port=5432;Database=mobile;Username=postgres;Password=postgres";
         var options = new DbContextOptionsBuilder<MobileDbContext>().UseNpgsql(conn).Options;
-        var tenant = new TenantContext();
-        tenant.SetTenant(null, isPlatformScope: true);
-        return new MobileDbContext(options, tenant);
+        var scope = new StoreContext();
+        scope.SetStore(null, isPlatformScope: true);
+        return new MobileDbContext(options, scope);
     }
 }

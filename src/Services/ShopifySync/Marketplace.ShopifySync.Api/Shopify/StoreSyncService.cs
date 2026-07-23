@@ -19,28 +19,28 @@ public sealed class StoreSyncService
     private readonly ShopifySyncDbContext _db;
     private readonly IShopifyClient _shopify;
     private readonly ISecretProtector _protector;
-    private readonly ITenantContext _tenant;
+    private readonly IStoreContext _scope;
     private readonly ILogger<StoreSyncService> _logger;
 
     public StoreSyncService(
         ShopifySyncDbContext db, IShopifyClient shopify, ISecretProtector protector,
-        ITenantContext tenant, ILogger<StoreSyncService> logger)
+        IStoreContext scope, ILogger<StoreSyncService> logger)
     {
         _db = db;
         _shopify = shopify;
         _protector = protector;
-        _tenant = tenant;
+        _scope = scope;
         _logger = logger;
     }
 
     public async Task<StoreSyncResult> SyncAsync(Guid merchantId, string trigger, CancellationToken ct)
     {
-        _tenant.SetTenant(merchantId, isPlatformScope: false);
+        _scope.SetStore(merchantId, isPlatformScope: false);
         var sw = Stopwatch.StartNew();
 
         try
         {
-            var integration = await _db.Integrations.FirstOrDefaultAsync(i => i.TenantId == merchantId, ct);
+            var integration = await _db.Integrations.FirstOrDefaultAsync(i => i.StoreId == merchantId, ct);
             if (integration is null || string.IsNullOrEmpty(integration.EncryptedAccessToken))
                 throw new InvalidOperationException("Mağaza Shopify entegrasyonu yok — önce bağlayın (/api/shopify/connect).");
 
@@ -208,10 +208,10 @@ public sealed class StoreSyncService
 
     private async Task<StoreSyncState> GetOrCreateStateAsync(Guid merchantId, CancellationToken ct)
     {
-        var state = await _db.SyncStates.FirstOrDefaultAsync(s => s.TenantId == merchantId, ct);
+        var state = await _db.SyncStates.FirstOrDefaultAsync(s => s.StoreId == merchantId, ct);
         if (state is null)
         {
-            state = new StoreSyncState { TenantId = merchantId };
+            state = new StoreSyncState { StoreId = merchantId };
             _db.SyncStates.Add(state);
         }
         return state;

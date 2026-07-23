@@ -16,20 +16,20 @@ namespace Marketplace.ShopifySync.Api.Consumers;
 public sealed class MerchantIntegrationConfiguredConsumer : IConsumer<MerchantIntegrationConfiguredIntegrationEvent>
 {
     private readonly ShopifySyncDbContext _db;
-    private readonly ITenantContext _tenant;
+    private readonly IStoreContext _scope;
     private readonly IMerchantCredentialClient _merchant;
     private readonly ISecretProtector _protector;
     private readonly ILogger<MerchantIntegrationConfiguredConsumer> _logger;
 
     public MerchantIntegrationConfiguredConsumer(
         ShopifySyncDbContext db,
-        ITenantContext tenant,
+        IStoreContext scope,
         IMerchantCredentialClient merchant,
         ISecretProtector protector,
         ILogger<MerchantIntegrationConfiguredConsumer> logger)
     {
         _db = db;
-        _tenant = tenant;
+        _scope = scope;
         _merchant = merchant;
         _protector = protector;
         _logger = logger;
@@ -41,7 +41,7 @@ public sealed class MerchantIntegrationConfiguredConsumer : IConsumer<MerchantIn
         if (!string.Equals(e.Provider, "shopify", StringComparison.OrdinalIgnoreCase))
             return;
 
-        _tenant.SetTenant(e.MerchantId, isPlatformScope: false);
+        _scope.SetStore(e.MerchantId, isPlatformScope: false);
 
         var config = await _merchant.GetIntegrationConfigAsync(e.MerchantId, "shopify", context.CancellationToken);
         if (config is null || !config.TryGetValue("shopDomain", out var shopDomain) || !config.TryGetValue("accessToken", out var accessToken))
@@ -50,10 +50,10 @@ public sealed class MerchantIntegrationConfiguredConsumer : IConsumer<MerchantIn
             return;
         }
 
-        var integration = await _db.Integrations.FirstOrDefaultAsync(i => i.TenantId == e.MerchantId, context.CancellationToken);
+        var integration = await _db.Integrations.FirstOrDefaultAsync(i => i.StoreId == e.MerchantId, context.CancellationToken);
         if (integration is null)
         {
-            integration = new ShopifyIntegration { TenantId = e.MerchantId };
+            integration = new ShopifyIntegration { StoreId = e.MerchantId };
             _db.Integrations.Add(integration);
         }
         integration.ShopDomain = shopDomain;

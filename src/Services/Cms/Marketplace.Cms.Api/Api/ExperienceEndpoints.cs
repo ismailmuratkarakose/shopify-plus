@@ -75,7 +75,9 @@ public static class ExperienceEndpoints
         });
 
         // --- Deneyim anlık görüntüsü ---
-        var experience = app.MapGroup("/api/experience").RequireAuthorization().WithTags("Experience");
+        // Yayınlanmış deneyim KAMUSALDIR: mobil uygulama (ve Mobil API) kimliksiz okur.
+        // Taslaklar bu uçtan sızmaz — snapshot yalnızca yayınlanan içerikten üretilir.
+        var experience = app.MapGroup("/api/experience").WithTags("Experience");
         var experienceWrite = app.MapGroup("/api/experience").RequireAuthorization(Policies.ContentPublish).WithTags("Experience");
 
         experience.MapGet("/current", async (HttpContext http, CmsDbContext db, CancellationToken ct) =>
@@ -94,7 +96,7 @@ public static class ExperienceEndpoints
             return Results.Content(snap.Json, "application/json");
         });
 
-        experience.MapGet("/versions", async (CmsDbContext db, CancellationToken ct) =>
+        experienceWrite.MapGet("/versions", async (CmsDbContext db, CancellationToken ct) =>
         {
             var items = await db.ExperienceSnapshots.OrderByDescending(s => s.Version).Take(50)
                 .Select(s => new { s.Version, s.CreatedAt, s.Reason, s.GeneratedBy })

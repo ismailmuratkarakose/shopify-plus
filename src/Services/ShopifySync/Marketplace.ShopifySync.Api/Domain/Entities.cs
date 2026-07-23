@@ -3,7 +3,7 @@ using Marketplace.BuildingBlocks.Domain;
 namespace Marketplace.ShopifySync.Api.Domain;
 
 /// <summary>Bir merchant'ın Shopify entegrasyonu (read-model). Token at-rest şifreli.</summary>
-public class ShopifyIntegration : AuditableTenantEntity
+public class ShopifyIntegration : AuditableStoreEntity
 {
     public string ShopDomain { get; set; } = default!;
     public string EncryptedAccessToken { get; set; } = default!;
@@ -11,7 +11,7 @@ public class ShopifyIntegration : AuditableTenantEntity
 }
 
 /// <summary>Pazaryeri ürünü ↔ Shopify ürünü eşlemesi (Sku anahtarlı; iki yönlü senkron + döngü önleme).</summary>
-public class ProductMapping : AuditableTenantEntity
+public class ProductMapping : AuditableStoreEntity
 {
     public string Sku { get; set; } = default!;
     public long ShopifyProductId { get; set; }

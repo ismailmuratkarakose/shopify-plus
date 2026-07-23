@@ -14,18 +14,18 @@ namespace Marketplace.ShopifySync.Api.Webhooks;
 public sealed class ShopifyWebhookProcessor
 {
     private readonly ShopifySyncDbContext _db;
-    private readonly ITenantContext _tenant;
+    private readonly IStoreContext _scope;
     private readonly IConfiguration _config;
     private readonly ILogger<ShopifyWebhookProcessor> _logger;
 
     public ShopifyWebhookProcessor(
         ShopifySyncDbContext db,
-        ITenantContext tenant,
+        IStoreContext scope,
         IConfiguration config,
         ILogger<ShopifyWebhookProcessor> logger)
     {
         _db = db;
-        _tenant = tenant;
+        _scope = scope;
         _config = config;
         _logger = logger;
     }
@@ -80,7 +80,7 @@ public sealed class ShopifyWebhookProcessor
 
         _db.SyncedProducts.Add(new SyncedProduct
         {
-            TenantId = pre.TenantId,
+            StoreId = pre.StoreId,
             ShopifyProductId = shopifyProductId,
             Title = title,
             Description = description,
@@ -93,7 +93,7 @@ public sealed class ShopifyWebhookProcessor
         });
 
         await CompleteAsync(pre, ct);
-        _logger.LogInformation("Shopify inbound ürün → read-model: shopifyId={Id} tenant={Tenant}", shopifyProductId, pre.TenantId);
+        _logger.LogInformation("Shopify inbound ürün → read-model: shopifyId={Id} tenant={Tenant}", shopifyProductId, pre.StoreId);
         return Results.Ok(new { status = "processed", shopifyProductId });
     }
 
@@ -119,18 +119,18 @@ public sealed class ShopifyWebhookProcessor
 
         variant.InventoryQuantity = available;
         await CompleteAsync(pre, ct);
-        _logger.LogInformation("Shopify inbound stok → read-model: sku={Sku} available={Qty} tenant={Tenant}", sku, available, pre.TenantId);
+        _logger.LogInformation("Shopify inbound stok → read-model: sku={Sku} available={Qty} tenant={Tenant}", sku, available, pre.StoreId);
         return Results.Ok(new { status = "processed", sku, available });
     }
 
-    // --- Ortak preamble: HMAC + idempotency + shop→tenant ---
+    // --- Ortak preamble: HMAC + idempotency + shop→mağaza ---
 
     private sealed class Preamble
     {
         public IResult? Failure { get; init; }
         public bool Duplicate { get; init; }
         public byte[] RawBody { get; init; } = [];
-        public Guid TenantId { get; init; }
+        public Guid StoreId { get; init; }
         public string WebhookId { get; init; } = "";
         public string Topic { get; init; } = "";
     }
@@ -159,8 +159,8 @@ public sealed class ShopifyWebhookProcessor
         if (integration is null)
             return new Preamble { Failure = Results.NotFound(new { message = $"Bilinmeyen/pasif mağaza: {shopDomain}" }) };
 
-        _tenant.SetTenant(integration.TenantId, isPlatformScope: false);
-        return new Preamble { RawBody = raw, TenantId = integration.TenantId, WebhookId = webhookId, Topic = topic };
+        _scope.SetStore(integration.StoreId, isPlatformScope: false);
+        return new Preamble { RawBody = raw, StoreId = integration.StoreId, WebhookId = webhookId, Topic = topic };
     }
 
     private async Task CompleteAsync(Preamble pre, CancellationToken ct)

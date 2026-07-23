@@ -4,9 +4,9 @@ namespace Marketplace.Cms.Api.Domain;
 
 /// <summary>
 /// Yayınlanmamış taslağı yetkisiz bir cihazda (ör. test telefonu) görüntülemek için üretilen süreli anahtar.
-/// Anahtar hem sayfayı hem mağazayı (tenant) belirler; böylece önizleme ucu anonim çalışabilir.
+/// Anahtar sayfayı belirler; böylece önizleme ucu anonim çalışabilir.
 /// </summary>
-public class PreviewToken : AuditableTenantEntity
+public class PreviewToken : AuditableEntity
 {
     public Guid PageId { get; set; }
     public string Token { get; set; } = default!;
@@ -18,7 +18,7 @@ public class PreviewToken : AuditableTenantEntity
 }
 
 /// <summary>Yüklenen görsel/medya varlığı. Dosyanın kendisi <see cref="StoragePath"/> altında saklanır.</summary>
-public class MediaAsset : AuditableTenantEntity
+public class MediaAsset : AuditableEntity
 {
     public string FileName { get; set; } = default!;
     public string ContentType { get; set; } = default!;

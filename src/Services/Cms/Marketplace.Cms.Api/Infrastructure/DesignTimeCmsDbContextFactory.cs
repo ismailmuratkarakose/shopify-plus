@@ -11,8 +11,8 @@ public sealed class DesignTimeCmsDbContextFactory : IDesignTimeDbContextFactory<
         var conn = Environment.GetEnvironmentVariable("CMS_DB")
                    ?? "Host=localhost;Port=5432;Database=cms;Username=postgres;Password=postgres";
         var options = new DbContextOptionsBuilder<CmsDbContext>().UseNpgsql(conn).Options;
-        var tenant = new TenantContext();
-        tenant.SetTenant(null, isPlatformScope: true);
-        return new CmsDbContext(options, tenant);
+        var scope = new StoreContext();
+        scope.SetStore(null, isPlatformScope: true);
+        return new CmsDbContext(options, scope);
     }
 }

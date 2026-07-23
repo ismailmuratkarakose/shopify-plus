@@ -38,7 +38,7 @@ public static class InternalEndpoints
             // Internal çağrı JWT tenant kapsamı taşımaz → query filter'ı bypass edip merchantId ile filtrele.
             var integration = await db.Integrations
                 .IgnoreQueryFilters()
-                .FirstOrDefaultAsync(i => i.TenantId == merchantId && i.Provider == provider && i.IsActive);
+                .FirstOrDefaultAsync(i => i.StoreId == merchantId && i.Provider == provider && i.IsActive);
 
             if (integration is null)
                 return Results.NotFound();
@@ -62,7 +62,7 @@ public static class InternalEndpoints
             Dictionary<string, string> config,
             HttpContext http,
             IConfiguration appConfig,
-            ITenantContext tenant,
+            IStoreContext scope,
             ISender sender) =>
         {
             var expected = appConfig["Internal:ApiKey"];
@@ -71,7 +71,7 @@ public static class InternalEndpoints
                 return Results.Unauthorized();
 
             // Internal çağrı JWT tenant taşımaz → tenant'ı merchantId'den kur (aynı request scope handler'a taşınır).
-            tenant.SetTenant(merchantId, isPlatformScope: false);
+            scope.SetStore(merchantId, isPlatformScope: false);
             var result = await sender.Send(new UpsertIntegrationCommand(provider, config));
             return result.ToHttpResult();
         });

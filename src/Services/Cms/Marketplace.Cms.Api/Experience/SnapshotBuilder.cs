@@ -1,5 +1,4 @@
 using System.Text.Json.Nodes;
-using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.Cms.Api.Domain;
 using Marketplace.Cms.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -11,13 +10,10 @@ namespace Marketplace.Cms.Api.Experience;
 /// Her yayın (veya bayrak değişikliği) yeni bir sürüm doğurur; mobil taraf sürüm numarasıyla
 /// önbellek geçerliliğini (ETag) yönetir.
 /// </summary>
-public sealed class SnapshotBuilder(CmsDbContext db, ITenantContext tenant, ILogger<SnapshotBuilder> logger)
+public sealed class SnapshotBuilder(CmsDbContext db, ILogger<SnapshotBuilder> logger)
 {
     public async Task<ExperienceSnapshot> RebuildAsync(string reason, string? by, CancellationToken ct)
     {
-        if (tenant.TenantId is not { } tenantId)
-            throw new InvalidOperationException("Snapshot üretimi için mağaza kapsamı gerekli.");
-
         var pages = await db.Pages
             .Include(p => p.Versions).ThenInclude(v => v.Components)
             .Where(p => p.IsActive && p.PublishedVersionId != null)
@@ -72,7 +68,6 @@ public sealed class SnapshotBuilder(CmsDbContext db, ITenantContext tenant, ILog
 
         var snapshot = new ExperienceSnapshot
         {
-            TenantId = tenantId,
             Version = version,
             Json = root.ToJsonString(),
             GeneratedBy = by,
@@ -81,8 +76,8 @@ public sealed class SnapshotBuilder(CmsDbContext db, ITenantContext tenant, ILog
         db.ExperienceSnapshots.Add(snapshot);
         await db.SaveChangesAsync(ct);
 
-        logger.LogInformation("Deneyim snapshot'ı üretildi: mağaza={Tenant} sürüm={Version} sayfa={Pages} sebep={Reason}",
-            tenantId, version, pagesNode.Count, reason);
+        logger.LogInformation("Deneyim snapshot'ı üretildi: sürüm={Version} sayfa={Pages} sebep={Reason}",
+            version, pagesNode.Count, reason);
         return snapshot;
     }
 }

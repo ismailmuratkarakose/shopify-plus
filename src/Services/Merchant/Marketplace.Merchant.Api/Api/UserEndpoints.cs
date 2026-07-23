@@ -31,17 +31,17 @@ public static class UserEndpoints
             new { role = Roles.ContentEditor, displayName = "İçerik Editörü", description = "İçerik hazırlar ve düzenler; yayınlayamaz" }
         }));
 
-        group.MapGet("/", async (ITenantContext tenant, IKeycloakAdminClient admin, CancellationToken ct) =>
+        group.MapGet("/", async (IStoreContext scope, IKeycloakAdminClient admin, CancellationToken ct) =>
         {
-            if (tenant.TenantId is not { } storeId) return NoStoreScope();
+            if (scope.StoreId is not { } storeId) return NoStoreScope();
             var users = await admin.GetStoreUsersAsync(storeId, ct);
             return Results.Ok(users);
         });
 
-        group.MapPost("/", async (InviteUserRequest req, ITenantContext tenant,
+        group.MapPost("/", async (InviteUserRequest req, IStoreContext scope,
             IKeycloakAdminClient admin, IAuditLogger audit, MerchantDbContext db, CancellationToken ct) =>
         {
-            if (tenant.TenantId is not { } storeId) return NoStoreScope();
+            if (scope.StoreId is not { } storeId) return NoStoreScope();
             if (string.IsNullOrWhiteSpace(req.Username))
                 return Problem("Kullanıcı adı zorunludur.", StatusCodes.Status400BadRequest, "user.invalid");
             if (!KeycloakAdminClient.IsAssignableRole(req.Role))
@@ -66,10 +66,10 @@ public static class UserEndpoints
             }
         });
 
-        group.MapPut("/{userId}/role", async (string userId, SetRoleRequest req, ITenantContext tenant,
+        group.MapPut("/{userId}/role", async (string userId, SetRoleRequest req, IStoreContext scope,
             IKeycloakAdminClient admin, IAuditLogger audit, MerchantDbContext db, CancellationToken ct) =>
         {
-            var check = await EnsureUserInStoreAsync(userId, tenant, admin, ct);
+            var check = await EnsureUserInStoreAsync(userId, scope, admin, ct);
             if (check is not null) return check;
 
             try
@@ -87,10 +87,10 @@ public static class UserEndpoints
             }
         });
 
-        group.MapPost("/{userId}/deactivate", async (string userId, ITenantContext tenant,
+        group.MapPost("/{userId}/deactivate", async (string userId, IStoreContext scope,
             IKeycloakAdminClient admin, IAuditLogger audit, MerchantDbContext db, CancellationToken ct) =>
         {
-            var check = await EnsureUserInStoreAsync(userId, tenant, admin, ct);
+            var check = await EnsureUserInStoreAsync(userId, scope, admin, ct);
             if (check is not null) return check;
             await admin.SetEnabledAsync(userId, false, ct);
             var user = await admin.GetUserAsync(userId, ct);
@@ -99,19 +99,19 @@ public static class UserEndpoints
             return Results.Ok(user);
         });
 
-        group.MapPost("/{userId}/activate", async (string userId, ITenantContext tenant,
+        group.MapPost("/{userId}/activate", async (string userId, IStoreContext scope,
             IKeycloakAdminClient admin, CancellationToken ct) =>
         {
-            var check = await EnsureUserInStoreAsync(userId, tenant, admin, ct);
+            var check = await EnsureUserInStoreAsync(userId, scope, admin, ct);
             if (check is not null) return check;
             await admin.SetEnabledAsync(userId, true, ct);
             return Results.Ok(await admin.GetUserAsync(userId, ct));
         });
 
-        group.MapPost("/{userId}/reset-password", async (string userId, ITenantContext tenant,
+        group.MapPost("/{userId}/reset-password", async (string userId, IStoreContext scope,
             IKeycloakAdminClient admin, CancellationToken ct) =>
         {
-            var check = await EnsureUserInStoreAsync(userId, tenant, admin, ct);
+            var check = await EnsureUserInStoreAsync(userId, scope, admin, ct);
             if (check is not null) return check;
 
             try
@@ -134,9 +134,9 @@ public static class UserEndpoints
     /// bir mağaza yöneticisinin başka mağazanın kullanıcısını değiştirmesini engeller.
     /// </summary>
     private static async Task<IResult?> EnsureUserInStoreAsync(
-        string userId, ITenantContext tenant, IKeycloakAdminClient admin, CancellationToken ct)
+        string userId, IStoreContext scope, IKeycloakAdminClient admin, CancellationToken ct)
     {
-        if (tenant.TenantId is not { } storeId) return NoStoreScope();
+        if (scope.StoreId is not { } storeId) return NoStoreScope();
 
         var user = await admin.GetUserAsync(userId, ct);
         if (user is null)
@@ -149,7 +149,7 @@ public static class UserEndpoints
 
     private static IResult NoStoreScope() => Problem(
         "Mağaza kapsamı yok. Platform kullanıcıları X-Acting-Store başlığıyla bir mağaza seçmelidir.",
-        StatusCodes.Status400BadRequest, "tenant.missing");
+        StatusCodes.Status400BadRequest, "store.missing");
 
     private static IResult Problem(string detail, int status, string title) =>
         Results.Problem(detail, statusCode: status, title: title);

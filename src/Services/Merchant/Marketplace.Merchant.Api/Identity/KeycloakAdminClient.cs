@@ -20,8 +20,8 @@ public record CreatePanelUser(
     string Role, string? Password, bool PasswordIsTemporary = true);
 
 /// <summary>
-/// Panel kullanıcılarının Keycloak üzerinde yönetimi (mağaza ekibi: store-admin, publish-manager,
-/// content-editor). Erişim, realm'deki service account client'ı ile client_credentials üzerinden alınır;
+/// Panel kullanıcılarının Keycloak üzerinde yönetimi (mağaza ekibi). Erişim, realm'deki
+/// service account client'ı ile client_credentials üzerinden alınır;
 /// yönetici parolası uygulamada tutulmaz.
 /// </summary>
 public interface IKeycloakAdminClient
@@ -42,8 +42,11 @@ public interface IKeycloakAdminClient
 
 public sealed class KeycloakAdminClient : IKeycloakAdminClient
 {
-    private static readonly string[] AssignableRoles =
-        ["store-admin", "publish-manager", "content-editor"];
+    // R1 GÜVENLİK: içerik rolleri (content-editor / publish-manager) PAZARYERİ personelinindir ve
+    // pazaryeri içeriğine yetki verir. Mağaza yöneticisi bu rolleri KENDİ kullanıcısına atayabilseydi
+    // pazaryeri CMS'ini düzenleme yetkisi dağıtmış olurdu. Mağaza ekibine yalnızca mağaza-seviyesi
+    // roller atanabilir; mağaza alt rolleri (ör. sipariş operatörü) geldikçe buraya eklenir.
+    private static readonly string[] AssignableRoles = ["store-admin"];
 
     private readonly HttpClient _http;
     private readonly IConfiguration _config;
@@ -118,7 +121,7 @@ public sealed class KeycloakAdminClient : IKeycloakAdminClient
     {
         // Keycloak 26: kullanıcı özniteliğine göre arama (q=key:value).
         using var req = await AuthorizedAsync(HttpMethod.Get,
-            $"{AdminBase}/users?q=tenant_id:{storeId}&max=200", ct);
+            $"{AdminBase}/users?q=store_id:{storeId}&max=200", ct);
         using var resp = await _http.SendAsync(req, ct);
         resp.EnsureSuccessStatusCode();
 
@@ -153,8 +156,8 @@ public sealed class KeycloakAdminClient : IKeycloakAdminClient
             ["lastName"] = request.LastName,
             ["enabled"] = true,
             ["emailVerified"] = false,
-            // Mağaza kimliği kullanıcı özniteliğinde tutulur; token'a `tenant_id` claim'i olarak yansır.
-            ["attributes"] = new Dictionary<string, string[]> { ["tenant_id"] = [storeId.ToString()] }
+            // Mağaza kimliği kullanıcı özniteliğinde tutulur; token'a `store_id` claim'i olarak yansır.
+            ["attributes"] = new Dictionary<string, string[]> { ["store_id"] = [storeId.ToString()] }
         };
 
         if (!string.IsNullOrWhiteSpace(request.Password))
@@ -188,14 +191,14 @@ public sealed class KeycloakAdminClient : IKeycloakAdminClient
                       ?? throw new InvalidOperationException("Kullanıcı oluşturuldu ancak okunamadı.");
 
         // Keycloak 24+ "declarative user profile": tanımlanmamış öznitelikler SESSİZCE düşer.
-        // tenant_id kaybolursa kullanıcı giriş yapar ama hiçbir mağaza kapsamı olmaz — erken yakala.
+        // store_id kaybolursa kullanıcı giriş yapar ama hiçbir mağaza kapsamı olmaz — erken yakala.
         if (created.StoreId != storeId)
         {
-            _logger.LogError("tenant_id özniteliği kalıcı olmadı: kullanıcı={Username} beklenen={Expected} okunan={Actual}",
+            _logger.LogError("store_id özniteliği kalıcı olmadı: kullanıcı={Username} beklenen={Expected} okunan={Actual}",
                 request.Username, storeId, created.StoreId);
             throw new InvalidOperationException(
-                "Kullanıcı oluşturuldu ancak mağaza kimliği (tenant_id) kaydedilemedi. " +
-                "Keycloak realm'inde 'tenant_id' kullanıcı profili özniteliği tanımlı olmalıdır.");
+                "Kullanıcı oluşturuldu ancak mağaza kimliği (store_id) kaydedilemedi. " +
+                "Keycloak realm'inde 'store_id' kullanıcı profili özniteliği tanımlı olmalıdır.");
         }
 
         _logger.LogInformation("Panel kullanıcısı oluşturuldu: {Username} ({Role}) mağaza={Store}",
@@ -281,7 +284,7 @@ public sealed class KeycloakAdminClient : IKeycloakAdminClient
         Guid? storeId = null;
         if (el.TryGetProperty("attributes", out var attrs) &&
             attrs.ValueKind == JsonValueKind.Object &&
-            attrs.TryGetProperty("tenant_id", out var t) &&
+            attrs.TryGetProperty("store_id", out var t) &&
             t.ValueKind == JsonValueKind.Array && t.GetArrayLength() > 0 &&
             Guid.TryParse(t[0].GetString(), out var parsed))
         {

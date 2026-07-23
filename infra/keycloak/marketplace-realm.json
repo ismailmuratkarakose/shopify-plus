@@ -45,12 +45,12 @@
       ],
       "protocolMappers": [
         {
-          "name": "tenant_id",
+          "name": "store_id",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-attribute-mapper",
           "config": {
-            "user.attribute": "tenant_id",
-            "claim.name": "tenant_id",
+            "user.attribute": "store_id",
+            "claim.name": "store_id",
             "jsonType.label": "String",
             "id.token.claim": "true",
             "access.token.claim": "true"
@@ -89,7 +89,7 @@
         "merchant"
       ],
       "attributes": {
-        "tenant_id": [
+        "store_id": [
           "11111111-1111-1111-1111-111111111111"
         ]
       }
@@ -133,7 +133,7 @@
         "merchant"
       ],
       "attributes": {
-        "tenant_id": [
+        "store_id": [
           "22222222-2222-2222-2222-222222222222"
         ]
       }
@@ -155,12 +155,7 @@
       ],
       "realmRoles": [
         "content-editor"
-      ],
-      "attributes": {
-        "tenant_id": [
-          "11111111-1111-1111-1111-111111111111"
-        ]
-      }
+      ]
     },
     {
       "username": "demo-publisher",
@@ -179,12 +174,7 @@
       ],
       "realmRoles": [
         "publish-manager"
-      ],
-      "attributes": {
-        "tenant_id": [
-          "11111111-1111-1111-1111-111111111111"
-        ]
-      }
+      ]
     },
     {
       "username": "service-account-marketplace-admin-api",
@@ -207,7 +197,7 @@
         "subComponents": {},
         "config": {
           "kc.user.profile.config": [
-            "{\"attributes\": [{\"name\": \"username\", \"displayName\": \"${username}\", \"validations\": {\"length\": {\"min\": 3, \"max\": 255}, \"username-prohibited-characters\": {}, \"up-username-not-idn-homograph\": {}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"email\", \"displayName\": \"${email}\", \"validations\": {\"email\": {}, \"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"firstName\", \"displayName\": \"${firstName}\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"lastName\", \"displayName\": \"${lastName}\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"tenant_id\", \"displayName\": \"Mağaza (tenant) kimliği\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false, \"annotations\": {\"inputType\": \"text\"}}], \"groups\": [{\"name\": \"user-metadata\", \"displayHeader\": \"User metadata\", \"displayDescription\": \"Attributes, which refer to user metadata\"}], \"unmanagedAttributePolicy\": \"ENABLED\"}"
+            "{\"attributes\": [{\"name\": \"username\", \"displayName\": \"${username}\", \"validations\": {\"length\": {\"min\": 3, \"max\": 255}, \"username-prohibited-characters\": {}, \"up-username-not-idn-homograph\": {}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"email\", \"displayName\": \"${email}\", \"validations\": {\"email\": {}, \"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"firstName\", \"displayName\": \"${firstName}\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"lastName\", \"displayName\": \"${lastName}\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\", \"user\"]}, \"multivalued\": false}, {\"name\": \"store_id\", \"displayName\": \"Mağaza kimliği\", \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false, \"annotations\": {\"inputType\": \"text\"}}], \"groups\": [{\"name\": \"user-metadata\", \"displayHeader\": \"User metadata\", \"displayDescription\": \"Attributes, which refer to user metadata\"}], \"unmanagedAttributePolicy\": \"ENABLED\"}"
           ]
         }
       }

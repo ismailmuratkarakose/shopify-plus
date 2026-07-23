@@ -52,15 +52,15 @@ public sealed class ReconciliationService : BackgroundService
 
     private async Task RunOnceAsync(CancellationToken ct)
     {
-        List<Guid> tenantIds;
+        List<Guid> storeIds;
         try
         {
             using var scope = _sp.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ShopifySyncDbContext>();
             // Arka plan işi HTTP kapsamı taşımaz → tüm mağazalar için kiracı filtresini atla.
-            tenantIds = await db.Integrations.IgnoreQueryFilters()
+            storeIds = await db.Integrations.IgnoreQueryFilters()
                 .Where(i => i.IsActive)
-                .Select(i => i.TenantId)
+                .Select(i => i.StoreId)
                 .ToListAsync(ct);
         }
         catch (Exception ex)
@@ -69,9 +69,9 @@ public sealed class ReconciliationService : BackgroundService
             return;
         }
 
-        if (tenantIds.Count == 0) return;
+        if (storeIds.Count == 0) return;
 
-        foreach (var tenantId in tenantIds)
+        foreach (var storeId in storeIds)
         {
             if (ct.IsCancellationRequested) return;
             try
@@ -79,12 +79,12 @@ public sealed class ReconciliationService : BackgroundService
                 // Her mağaza için ayrı kapsam: kiracı bağlamı ve DbContext izole kalsın.
                 using var scope = _sp.CreateScope();
                 var sync = scope.ServiceProvider.GetRequiredService<StoreSyncService>();
-                await sync.SyncAsync(tenantId, "reconciliation", ct);
+                await sync.SyncAsync(storeId, "reconciliation", ct);
             }
             catch (Exception ex)
             {
                 // Bir mağazanın hatası diğerlerini durdurmasın (hata durumu kaydına yazıldı).
-                _logger.LogWarning(ex, "Mutabakat başarısız: merchant={MerchantId}", tenantId);
+                _logger.LogWarning(ex, "Mutabakat başarısız: merchant={MerchantId}", storeId);
             }
         }
     }

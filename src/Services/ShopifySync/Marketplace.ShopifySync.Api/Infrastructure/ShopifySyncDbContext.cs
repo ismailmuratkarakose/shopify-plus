@@ -8,11 +8,11 @@ namespace Marketplace.ShopifySync.Api.Infrastructure;
 
 public class ShopifySyncDbContext : DbContext
 {
-    private readonly ITenantContext _tenant;
+    private readonly IStoreContext _scope;
 
-    public ShopifySyncDbContext(DbContextOptions<ShopifySyncDbContext> options, ITenantContext tenant)
+    public ShopifySyncDbContext(DbContextOptions<ShopifySyncDbContext> options, IStoreContext scope)
         : base(options)
-        => _tenant = tenant;
+        => _scope = scope;
 
     public DbSet<ShopifyIntegration> Integrations => Set<ShopifyIntegration>();
     public DbSet<ProductMapping> ProductMappings => Set<ProductMapping>();
@@ -33,16 +33,16 @@ public class ShopifySyncDbContext : DbContext
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.ShopDomain).HasMaxLength(255).IsRequired();
-            e.HasIndex(x => x.TenantId).IsUnique(); // merchant başına tek Shopify entegrasyonu
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+            e.HasIndex(x => x.StoreId).IsUnique(); // merchant başına tek Shopify entegrasyonu
+            e.HasQueryFilter(x => _scope.IsPlatformScope || x.StoreId == _scope.StoreId);
         });
 
         modelBuilder.Entity<ProductMapping>(e =>
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.Sku).HasMaxLength(100).IsRequired();
-            e.HasIndex(x => new { x.TenantId, x.Sku }).IsUnique();
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+            e.HasIndex(x => new { x.StoreId, x.Sku }).IsUnique();
+            e.HasQueryFilter(x => _scope.IsPlatformScope || x.StoreId == _scope.StoreId);
         });
 
         modelBuilder.Entity<WebhookInbox>(e =>
@@ -61,9 +61,9 @@ public class ShopifySyncDbContext : DbContext
             e.Property(x => x.Status).HasMaxLength(30).IsRequired();
             e.Property(x => x.Vendor).HasMaxLength(200);
             e.Property(x => x.ProductType).HasMaxLength(200);
-            e.HasIndex(x => new { x.TenantId, x.ShopifyProductId }).IsUnique();
+            e.HasIndex(x => new { x.StoreId, x.ShopifyProductId }).IsUnique();
             e.HasMany(x => x.Variants).WithOne().HasForeignKey(v => v.SyncedProductId).OnDelete(DeleteBehavior.Cascade);
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+            e.HasQueryFilter(x => _scope.IsPlatformScope || x.StoreId == _scope.StoreId);
         });
 
         modelBuilder.Entity<SyncedVariant>(e =>
@@ -81,9 +81,9 @@ public class ShopifySyncDbContext : DbContext
             e.HasKey(x => x.Id);
             e.Property(x => x.Title).HasMaxLength(500).IsRequired();
             e.Property(x => x.Handle).HasMaxLength(300).IsRequired();
-            e.HasIndex(x => new { x.TenantId, x.ShopifyCollectionId }).IsUnique();
+            e.HasIndex(x => new { x.StoreId, x.ShopifyCollectionId }).IsUnique();
             e.HasMany(x => x.Products).WithOne().HasForeignKey(p => p.SyncedCollectionId).OnDelete(DeleteBehavior.Cascade);
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+            e.HasQueryFilter(x => _scope.IsPlatformScope || x.StoreId == _scope.StoreId);
         });
 
         modelBuilder.Entity<SyncedCollectionProduct>(e => e.HasKey(x => x.Id));
@@ -97,10 +97,10 @@ public class ShopifySyncDbContext : DbContext
             e.Property(x => x.FulfillmentStatus).HasMaxLength(30);
             e.Property(x => x.Currency).HasMaxLength(3).IsRequired();
             e.Property(x => x.TotalPrice).HasPrecision(18, 2);
-            e.HasIndex(x => new { x.TenantId, x.ShopifyOrderId }).IsUnique();
-            e.HasIndex(x => new { x.TenantId, x.ShopifyCustomerId });
+            e.HasIndex(x => new { x.StoreId, x.ShopifyOrderId }).IsUnique();
+            e.HasIndex(x => new { x.StoreId, x.ShopifyCustomerId });
             e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.SyncedOrderId).OnDelete(DeleteBehavior.Cascade);
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+            e.HasQueryFilter(x => _scope.IsPlatformScope || x.StoreId == _scope.StoreId);
         });
 
         modelBuilder.Entity<SyncedOrderLine>(e =>
@@ -119,8 +119,8 @@ public class ShopifySyncDbContext : DbContext
             e.Property(x => x.LastName).HasMaxLength(200);
             e.Property(x => x.Phone).HasMaxLength(50);
             e.Property(x => x.TotalSpent).HasPrecision(18, 2);
-            e.HasIndex(x => new { x.TenantId, x.ShopifyCustomerId }).IsUnique();
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+            e.HasIndex(x => new { x.StoreId, x.ShopifyCustomerId }).IsUnique();
+            e.HasQueryFilter(x => _scope.IsPlatformScope || x.StoreId == _scope.StoreId);
         });
 
         modelBuilder.Entity<SyncedDiscount>(e =>
@@ -132,8 +132,8 @@ public class ShopifySyncDbContext : DbContext
             e.Property(x => x.Currency).HasMaxLength(3);
             e.Property(x => x.Status).HasMaxLength(30).IsRequired();
             e.Property(x => x.Value).HasPrecision(18, 2);
-            e.HasIndex(x => new { x.TenantId, x.ShopifyDiscountId }).IsUnique();
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+            e.HasIndex(x => new { x.StoreId, x.ShopifyDiscountId }).IsUnique();
+            e.HasQueryFilter(x => _scope.IsPlatformScope || x.StoreId == _scope.StoreId);
         });
 
         modelBuilder.Entity<SyncedPage>(e =>
@@ -142,8 +142,8 @@ public class ShopifySyncDbContext : DbContext
             e.Property(x => x.Title).HasMaxLength(500).IsRequired();
             e.Property(x => x.Handle).HasMaxLength(300).IsRequired();
             e.Property(x => x.Status).HasMaxLength(30).IsRequired();
-            e.HasIndex(x => new { x.TenantId, x.ShopifyPageId }).IsUnique();
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+            e.HasIndex(x => new { x.StoreId, x.ShopifyPageId }).IsUnique();
+            e.HasQueryFilter(x => _scope.IsPlatformScope || x.StoreId == _scope.StoreId);
         });
 
         modelBuilder.Entity<StoreSyncState>(e =>
@@ -152,8 +152,8 @@ public class ShopifySyncDbContext : DbContext
             e.Property(x => x.LastStatus).HasMaxLength(20).IsRequired();
             e.Property(x => x.LastTrigger).HasMaxLength(20).IsRequired();
             e.Property(x => x.LastError).HasMaxLength(2000);
-            e.HasIndex(x => x.TenantId).IsUnique();   // mağaza başına tek durum kaydı
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+            e.HasIndex(x => x.StoreId).IsUnique();   // mağaza başına tek durum kaydı
+            e.HasQueryFilter(x => _scope.IsPlatformScope || x.StoreId == _scope.StoreId);
         });
 
         modelBuilder.AddOutboxMessage("shopify");
@@ -164,9 +164,9 @@ public class ShopifySyncDbContext : DbContext
     {
         foreach (var entry in ChangeTracker.Entries())
         {
-            if (entry.Entity is ITenantOwned owned && entry.State == EntityState.Added &&
-                owned.TenantId == Guid.Empty && _tenant.TenantId is { } tid)
-                owned.TenantId = tid;
+            if (entry.Entity is IStoreOwned owned && entry.State == EntityState.Added &&
+                owned.StoreId == Guid.Empty && _scope.StoreId is { } tid)
+                owned.StoreId = tid;
 
             if (entry.Entity is IAuditable audit && entry.State == EntityState.Modified)
                 audit.UpdatedAt = DateTimeOffset.UtcNow;

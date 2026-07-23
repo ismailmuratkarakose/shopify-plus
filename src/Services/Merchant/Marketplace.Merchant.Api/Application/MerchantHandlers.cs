@@ -46,7 +46,7 @@ public sealed class CreateMerchantHandler : IRequestHandler<CreateMerchantComman
         _db.Merchants.Add(merchant);
         _db.EnqueueIntegrationEvent(new MerchantRegisteredIntegrationEvent
         {
-            TenantId = merchant.Id,
+            StoreId = merchant.Id,
             MerchantId = merchant.Id,
             Name = merchant.Name,
             Slug = merchant.Slug,
@@ -87,18 +87,18 @@ public sealed class GetMerchantsHandler : IRequestHandler<GetMerchantsQuery, Res
 public sealed class GetMyMerchantHandler : IRequestHandler<GetMyMerchantQuery, Result<MerchantDto>>
 {
     private readonly MerchantDbContext _db;
-    private readonly ITenantContext _tenant;
+    private readonly IStoreContext _scope;
 
-    public GetMyMerchantHandler(MerchantDbContext db, ITenantContext tenant)
+    public GetMyMerchantHandler(MerchantDbContext db, IStoreContext scope)
     {
         _db = db;
-        _tenant = tenant;
+        _scope = scope;
     }
 
     public async Task<Result<MerchantDto>> Handle(GetMyMerchantQuery request, CancellationToken ct)
     {
-        if (_tenant.TenantId is null)
-            return Result.Failure<MerchantDto>(Error.Unauthorized("tenant.missing", "İstek bir merchant kapsamı taşımıyor."));
+        if (_scope.StoreId is null)
+            return Result.Failure<MerchantDto>(Error.Unauthorized("store.missing", "İstek bir merchant kapsamı taşımıyor."));
 
         // Query filter zaten kendi merchant'ına sınırlar.
         var m = await _db.Merchants.FirstOrDefaultAsync(ct);
@@ -111,18 +111,18 @@ public sealed class GetMyMerchantHandler : IRequestHandler<GetMyMerchantQuery, R
 public sealed class UpsertIntegrationHandler : IRequestHandler<UpsertIntegrationCommand, Result<IntegrationDto>>
 {
     private readonly MerchantDbContext _db;
-    private readonly ITenantContext _tenant;
+    private readonly IStoreContext _scope;
     private readonly ISecretProtector _protector;
     private readonly IValidator<UpsertIntegrationCommand> _validator;
 
     public UpsertIntegrationHandler(
         MerchantDbContext db,
-        ITenantContext tenant,
+        IStoreContext scope,
         ISecretProtector protector,
         IValidator<UpsertIntegrationCommand> validator)
     {
         _db = db;
-        _tenant = tenant;
+        _scope = scope;
         _protector = protector;
         _validator = validator;
     }
@@ -133,8 +133,8 @@ public sealed class UpsertIntegrationHandler : IRequestHandler<UpsertIntegration
         if (!validation.IsValid)
             return Result.Failure<IntegrationDto>(Error.Validation("integration.invalid", validation.Errors[0].ErrorMessage));
 
-        if (_tenant.TenantId is null)
-            return Result.Failure<IntegrationDto>(Error.Unauthorized("tenant.missing", "İstek bir merchant kapsamı taşımıyor."));
+        if (_scope.StoreId is null)
+            return Result.Failure<IntegrationDto>(Error.Unauthorized("store.missing", "İstek bir merchant kapsamı taşımıyor."));
 
         var encrypted = _protector.Protect(JsonSerializer.Serialize(request.Config));
 
@@ -152,8 +152,8 @@ public sealed class UpsertIntegrationHandler : IRequestHandler<UpsertIntegration
 
         _db.EnqueueIntegrationEvent(new MerchantIntegrationConfiguredIntegrationEvent
         {
-            TenantId = _tenant.TenantId,
-            MerchantId = _tenant.TenantId.Value,
+            StoreId = _scope.StoreId,
+            MerchantId = _scope.StoreId.Value,
             Provider = request.Provider,
             IsActive = true
         });
@@ -161,7 +161,7 @@ public sealed class UpsertIntegrationHandler : IRequestHandler<UpsertIntegration
         if (string.Equals(request.Provider, IntegrationProvider.Shopify, StringComparison.OrdinalIgnoreCase))
         {
             var store = await _db.Merchants.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(m => m.Id == _tenant.TenantId, ct);
+                .FirstOrDefaultAsync(m => m.Id == _scope.StoreId, ct);
             if (store is { Status: MerchantStatus.Pending })
                 store.Status = MerchantStatus.Active;
         }

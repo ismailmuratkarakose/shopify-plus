@@ -7,11 +7,11 @@ namespace Marketplace.Mobile.Api.Infrastructure;
 
 public class MobileDbContext : DbContext
 {
-    private readonly ITenantContext _tenant;
+    private readonly IStoreContext _scope;
 
-    public MobileDbContext(DbContextOptions<MobileDbContext> options, ITenantContext tenant)
+    public MobileDbContext(DbContextOptions<MobileDbContext> options, IStoreContext scope)
         : base(options)
-        => _tenant = tenant;
+        => _scope = scope;
 
     public DbSet<FavoriteProduct> Favorites => Set<FavoriteProduct>();
     public DbSet<RecentlyViewedProduct> RecentlyViewed => Set<RecentlyViewedProduct>();
@@ -24,17 +24,17 @@ public class MobileDbContext : DbContext
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.UserRef).HasMaxLength(200).IsRequired();
-            e.HasIndex(x => new { x.TenantId, x.UserRef, x.ShopifyProductId }).IsUnique();
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+            e.HasIndex(x => new { x.StoreId, x.UserRef, x.ShopifyProductId }).IsUnique();
+            e.HasQueryFilter(x => _scope.IsPlatformScope || x.StoreId == _scope.StoreId);
         });
 
         modelBuilder.Entity<RecentlyViewedProduct>(e =>
         {
             e.HasKey(x => x.Id);
             e.Property(x => x.UserRef).HasMaxLength(200).IsRequired();
-            e.HasIndex(x => new { x.TenantId, x.UserRef, x.ShopifyProductId }).IsUnique();
-            e.HasIndex(x => new { x.TenantId, x.UserRef, x.ViewedAt });
-            e.HasQueryFilter(x => _tenant.IsPlatformScope || x.TenantId == _tenant.TenantId);
+            e.HasIndex(x => new { x.StoreId, x.UserRef, x.ShopifyProductId }).IsUnique();
+            e.HasIndex(x => new { x.StoreId, x.UserRef, x.ViewedAt });
+            e.HasQueryFilter(x => _scope.IsPlatformScope || x.StoreId == _scope.StoreId);
         });
 
         base.OnModelCreating(modelBuilder);
@@ -44,9 +44,9 @@ public class MobileDbContext : DbContext
     {
         foreach (var entry in ChangeTracker.Entries())
         {
-            if (entry.Entity is ITenantOwned owned && entry.State == EntityState.Added &&
-                owned.TenantId == Guid.Empty && _tenant.TenantId is { } tid)
-                owned.TenantId = tid;
+            if (entry.Entity is IStoreOwned owned && entry.State == EntityState.Added &&
+                owned.StoreId == Guid.Empty && _scope.StoreId is { } tid)
+                owned.StoreId = tid;
 
             if (entry.Entity is IAuditable audit && entry.State == EntityState.Modified)
                 audit.UpdatedAt = DateTimeOffset.UtcNow;

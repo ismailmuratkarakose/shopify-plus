@@ -15,7 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddMarketplaceOpenApi();
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ITenantContext, TenantContext>();
+builder.Services.AddScoped<IStoreContext, StoreContext>();
 
 builder.Services.AddDbContext<ShopifySyncDbContext>(opt =>
     opt.UseNpgsql(builder.Configuration.GetConnectionString("ShopifyDb")));
@@ -88,7 +88,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseAuthentication();
-app.UseTenantResolution();
+app.UseStoreResolution();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");

@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using Marketplace.BuildingBlocks.Auditing;
-using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.BuildingBlocks.Web;
 using Marketplace.Cms.Api.Domain;
 using Marketplace.Cms.Api.Infrastructure;
@@ -25,12 +24,10 @@ public static class MediaEndpoints
     {
         var group = app.MapGroup("/api/media").WithTags("Media");
 
-        group.MapPost("/", async (HttpRequest request, ClaimsPrincipal user, ITenantContext tenant,
+        group.MapPost("/", async (HttpRequest request, ClaimsPrincipal user,
             IMediaStorage storage, CmsDbContext db, IConfiguration config, IAuditLogger audit,
             CancellationToken ct) =>
         {
-            if (tenant.TenantId is not { } tenantId)
-                return Results.Problem("Mağaza kapsamı yok.", statusCode: StatusCodes.Status401Unauthorized, title: "tenant.missing");
             if (!request.HasFormContentType)
                 return Results.Problem("Dosya multipart/form-data olarak gönderilmeli.",
                     statusCode: StatusCodes.Status400BadRequest, title: "media.invalid_request");
@@ -50,11 +47,10 @@ public static class MediaEndpoints
                     statusCode: StatusCodes.Status400BadRequest, title: "media.unsupported_type");
 
             await using var stream = file.OpenReadStream();
-            var path = await storage.SaveAsync(stream, tenantId, file.FileName, ct);
+            var path = await storage.SaveAsync(stream, file.FileName, ct);
 
             var asset = new MediaAsset
             {
-                TenantId = tenantId,
                 FileName = Path.GetFileName(file.FileName),
                 ContentType = file.ContentType,
                 SizeBytes = file.Length,
@@ -78,7 +74,7 @@ public static class MediaEndpoints
         // Dosya içeriği: anonim (görseller gizli değil; kimlik tahmin edilemez GUID).
         group.MapGet("/{id:guid}/content", async (Guid id, CmsDbContext db, IMediaStorage storage, CancellationToken ct) =>
         {
-            var asset = await db.MediaAssets.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.Id == id, ct);
+            var asset = await db.MediaAssets.FirstOrDefaultAsync(m => m.Id == id, ct);
             if (asset is null) return Results.NotFound();
 
             var stream = await storage.OpenAsync(asset.StoragePath, ct);

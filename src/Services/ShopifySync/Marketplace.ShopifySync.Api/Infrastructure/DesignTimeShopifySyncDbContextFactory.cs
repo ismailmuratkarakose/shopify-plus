@@ -11,8 +11,8 @@ public sealed class DesignTimeShopifySyncDbContextFactory : IDesignTimeDbContext
         var conn = Environment.GetEnvironmentVariable("SHOPIFY_DB")
                    ?? "Host=localhost;Port=5432;Database=shopifysync;Username=postgres;Password=postgres";
         var options = new DbContextOptionsBuilder<ShopifySyncDbContext>().UseNpgsql(conn).Options;
-        var tenant = new TenantContext();
-        tenant.SetTenant(null, isPlatformScope: true);
-        return new ShopifySyncDbContext(options, tenant);
+        var scope = new StoreContext();
+        scope.SetStore(null, isPlatformScope: true);
+        return new ShopifySyncDbContext(options, scope);
     }
 }

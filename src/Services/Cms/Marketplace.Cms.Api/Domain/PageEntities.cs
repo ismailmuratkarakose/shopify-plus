@@ -16,8 +16,8 @@ public enum ScreenType
 public static class ScreenTypes
 {
     /// <summary>
-    /// Uygulamada TEK bir örneği olabilen ekranlar. Bunlar için mağaza başına birden fazla sayfa
-    /// tanımlanamaz; aksi hâlde mobil tarafta hangi sayfanın gösterileceği belirsiz kalır.
+    /// Uygulamada TEK bir örneği olabilen ekranlar. Bunlar için birden fazla sayfa tanımlanamaz;
+    /// aksi hâlde mobil tarafta hangi sayfanın gösterileceği belirsiz kalır.
     /// Kampanya ve landing sayfaları çoklu olabilir (handle ile ayrışır).
     /// </summary>
     public static bool IsSingleton(ScreenType type) => type is
@@ -36,11 +36,11 @@ public enum VersionStatus
 /// Mantıksal sayfa (ekran). İçerik doğrudan burada değil, sürümlerde (<see cref="PageVersion"/>) tutulur:
 /// böylece taslak düzenlenirken yayındaki içerik etkilenmez.
 /// </summary>
-public class Page : AuditableTenantEntity
+public class Page : AuditableEntity
 {
     public ScreenType ScreenType { get; set; }
     public string Name { get; set; } = default!;
-    /// <summary>Mağaza içinde benzersiz kısa ad (ör. "ana-sayfa", "yaz-kampanyasi").</summary>
+    /// <summary>Pazaryeri içinde benzersiz kısa ad (ör. "ana-sayfa", "yaz-kampanyasi").</summary>
     public string Handle { get; set; } = default!;
     public bool IsActive { get; set; } = true;
 
@@ -51,7 +51,7 @@ public class Page : AuditableTenantEntity
 }
 
 /// <summary>Bir sayfanın belirli bir içerik sürümü. Yayınlanan sürüm dondurulur; düzenleme yeni taslakta sürer.</summary>
-public class PageVersion : AuditableTenantEntity
+public class PageVersion : AuditableEntity
 {
     public Guid PageId { get; set; }
     public int VersionNumber { get; set; }

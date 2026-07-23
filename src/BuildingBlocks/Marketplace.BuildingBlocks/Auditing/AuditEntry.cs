@@ -9,8 +9,8 @@ public class AuditEntry
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    /// <summary>İşlemin yapıldığı mağaza. Platform geneli işlemlerde null olabilir.</summary>
-    public Guid? TenantId { get; set; }
+    /// <summary>İşlemin yapıldığı mağaza. Pazaryeri geneli işlemlerde (ör. CMS içeriği) null.</summary>
+    public Guid? StoreId { get; set; }
 
     public string ActorId { get; set; } = default!;
     public string ActorName { get; set; } = default!;

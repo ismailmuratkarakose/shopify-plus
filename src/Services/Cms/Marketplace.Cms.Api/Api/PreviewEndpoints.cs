@@ -15,7 +15,7 @@ public static class PreviewEndpoints
         app.MapGet("/api/preview/{token}", async (string token, CmsDbContext db, CancellationToken ct) =>
         {
             // Anahtar tabanlı erişim → kiracı filtresi atlanır (kapsam anahtarla belirlenir).
-            var pt = await db.PreviewTokens.IgnoreQueryFilters()
+            var pt = await db.PreviewTokens
                 .FirstOrDefaultAsync(t => t.Token == token, ct);
 
             if (pt is null)
@@ -24,9 +24,9 @@ public static class PreviewEndpoints
                 return Results.Problem("Önizleme anahtarının süresi dolmuş veya iptal edilmiş.",
                     statusCode: StatusCodes.Status410Gone, title: "preview.expired");
 
-            var page = await db.Pages.IgnoreQueryFilters()
+            var page = await db.Pages
                 .Include(p => p.Versions).ThenInclude(v => v.Components)
-                .FirstOrDefaultAsync(p => p.Id == pt.PageId && p.TenantId == pt.TenantId, ct);
+                .FirstOrDefaultAsync(p => p.Id == pt.PageId, ct);
             if (page is null)
                 return Results.Problem("Sayfa bulunamadı.", statusCode: StatusCodes.Status404NotFound, title: "page.not_found");
 

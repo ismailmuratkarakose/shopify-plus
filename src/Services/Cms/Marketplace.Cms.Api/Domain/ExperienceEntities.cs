@@ -6,7 +6,7 @@ namespace Marketplace.Cms.Api.Domain;
 /// Uzaktan yapılandırma bayrağı: mobil uygulamada bir özelliği uygulama güncellemesi
 /// gerektirmeden açıp kapatmayı sağlar. Snapshot'a dahil edilir.
 /// </summary>
-public class FeatureFlag : AuditableTenantEntity
+public class FeatureFlag : AuditableEntity
 {
     public string Key { get; set; } = default!;
     public bool IsEnabled { get; set; }
@@ -20,7 +20,7 @@ public class FeatureFlag : AuditableTenantEntity
 /// içerik yayınlandıkça yeni sürüm üretilir (eski sürümler geçmişte kalır).
 /// Bu sayede mobil taraf CMS'in iç modeline değil, sabit bir sözleşmeye bağlanır.
 /// </summary>
-public class ExperienceSnapshot : AuditableTenantEntity
+public class ExperienceSnapshot : AuditableEntity
 {
     public int Version { get; set; }
     /// <summary>Tüm yayınlanan ekranlar + bayraklar (JSON).</summary>

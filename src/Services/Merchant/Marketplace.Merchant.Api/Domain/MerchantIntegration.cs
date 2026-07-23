@@ -16,7 +16,7 @@ public static class IntegrationProvider
 /// Hassas anahtarlar <see cref="EncryptedConfig"/> içinde AES-GCM ile şifreli tutulur.
 /// TenantId, bu entegrasyonun ait olduğu merchant'tır.
 /// </summary>
-public class MerchantIntegration : AuditableTenantEntity
+public class MerchantIntegration : AuditableStoreEntity
 {
     public string Provider { get; set; } = default!;
 

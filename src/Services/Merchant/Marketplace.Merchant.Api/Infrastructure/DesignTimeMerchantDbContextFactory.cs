@@ -15,8 +15,8 @@ public sealed class DesignTimeMerchantDbContextFactory : IDesignTimeDbContextFac
             .UseNpgsql(conn)
             .Options;
 
-        var tenant = new TenantContext();
-        tenant.SetTenant(null, isPlatformScope: true);
-        return new MerchantDbContext(options, tenant);
+        var scope = new StoreContext();
+        scope.SetStore(null, isPlatformScope: true);
+        return new MerchantDbContext(options, scope);
     }
 }

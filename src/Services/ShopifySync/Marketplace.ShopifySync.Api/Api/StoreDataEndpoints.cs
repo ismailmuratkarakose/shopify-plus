@@ -25,10 +25,10 @@ public static class StoreDataEndpoints
         var group = app.MapGroup("/api/shopify").RequireAuthorization().WithTags("StoreData");
 
         // Senkronu tetikle (Faz B: inline; ileride arka plan job + webhook incremental).
-        group.MapPost("/sync", async (ITenantContext tenant, StoreSyncService sync, CancellationToken ct) =>
+        group.MapPost("/sync", async (IStoreContext scope, StoreSyncService sync, CancellationToken ct) =>
         {
-            if (tenant.TenantId is not { } merchantId)
-                return Results.Problem("Mağaza kapsamı yok.", statusCode: StatusCodes.Status401Unauthorized, title: "tenant.missing");
+            if (scope.StoreId is not { } merchantId)
+                return Results.Problem("Mağaza kapsamı yok.", statusCode: StatusCodes.Status401Unauthorized, title: "store.missing");
             try
             {
                 var r = await sync.SyncAsync(merchantId, "manual", ct);

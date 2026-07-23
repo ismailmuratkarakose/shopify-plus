@@ -17,14 +17,14 @@ public static class ShopifyOAuthEndpoints
     {
         app.MapPost("/api/shopify/connect", async (
             ConnectRequest req,
-            ITenantContext tenant,
+            IStoreContext scope,
             IShopifyOAuth oauth,
             IMerchantIntegrationWriter writer,
             CancellationToken ct) =>
         {
-            if (tenant.TenantId is not { } merchantId)
+            if (scope.StoreId is not { } merchantId)
                 return Results.Problem("İstek bir mağaza (tenant) kapsamı taşımıyor.",
-                    statusCode: StatusCodes.Status401Unauthorized, title: "tenant.missing");
+                    statusCode: StatusCodes.Status401Unauthorized, title: "store.missing");
             if (string.IsNullOrWhiteSpace(req.Shop))
                 return Results.Problem("Mağaza (shop) gerekli.", statusCode: StatusCodes.Status400BadRequest, title: "shop.required");
 

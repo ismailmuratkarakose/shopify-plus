@@ -14,7 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddMarketplaceOpenApi();
 
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ITenantContext, TenantContext>();
+builder.Services.AddScoped<IStoreContext, StoreContext>();
 
 builder.Services.AddDbContext<CmsDbContext>(opt =>
     opt.UseNpgsql(builder.Configuration.GetConnectionString("CmsDb")));
@@ -45,7 +45,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseAuthentication();
-app.UseTenantResolution();
+app.UseStoreResolution();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");
@@ -53,7 +53,8 @@ app.MapPageEndpoints();
 app.MapExperienceEndpoints();
 app.MapPreviewEndpoints();
 app.MapMediaEndpoints();
-app.MapAuditEndpoints<CmsDbContext>();
+// İçerik denetim kaydı pazaryeri personelinindir (mağaza yöneticilerinin değil).
+app.MapAuditEndpoints<CmsDbContext>(policy: Policies.ContentPublish);
 
 app.Run();
 
