@@ -50,7 +50,7 @@ public static class UserEndpoints
             {
                 var created = await admin.CreateStoreUserAsync(storeId,
                     new CreatePanelUser(req.Username.Trim(), req.Email, req.FirstName, req.LastName,
-                        req.Role, req.TemporaryPassword), ct);
+                        req.Role, req.TemporaryPassword, PasswordIsTemporary: true), ct);
                 return Results.Created($"/api/users/{created.Id}", created);
             }
             catch (InvalidOperationException ex)

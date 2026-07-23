@@ -9,9 +9,15 @@ public record PanelUser(
     string Id, string Username, string? Email, string? FirstName, string? LastName,
     bool Enabled, Guid? StoreId, IReadOnlyList<string> Roles);
 
+/// <param name="Password">Başlangıç parolası (opsiyonel).</param>
+/// <param name="PasswordIsTemporary">
+/// true ise kullanıcı ilk girişte parolasını değiştirmek zorundadır (yönetici daveti senaryosu).
+/// Kendi kaydını yapan mağaza sahibi parolayı kendisi belirlediği için false olmalıdır;
+/// aksi hâlde Keycloak "Account is not fully set up" diyerek girişi reddeder.
+/// </param>
 public record CreatePanelUser(
     string Username, string? Email, string? FirstName, string? LastName,
-    string Role, string? TemporaryPassword);
+    string Role, string? Password, bool PasswordIsTemporary = true);
 
 /// <summary>
 /// Panel kullanıcılarının Keycloak üzerinde yönetimi (mağaza ekibi: store-admin, publish-manager,
@@ -26,6 +32,12 @@ public interface IKeycloakAdminClient
     Task SetRoleAsync(string userId, string role, CancellationToken ct);
     Task SetEnabledAsync(string userId, bool enabled, CancellationToken ct);
     Task SendPasswordResetAsync(string userId, CancellationToken ct);
+
+    /// <summary>Kullanıcı adı veya e-posta zaten kayıtlı mı (kayıt öncesi kontrol).</summary>
+    Task<bool> ExistsAsync(string username, string? email, CancellationToken ct);
+
+    /// <summary>Telafi amaçlı silme: kayıt akışının ikinci adımı başarısız olursa geri alınır.</summary>
+    Task DeleteUserAsync(string userId, CancellationToken ct);
 }
 
 public sealed class KeycloakAdminClient : IKeycloakAdminClient
@@ -145,11 +157,16 @@ public sealed class KeycloakAdminClient : IKeycloakAdminClient
             ["attributes"] = new Dictionary<string, string[]> { ["tenant_id"] = [storeId.ToString()] }
         };
 
-        if (!string.IsNullOrWhiteSpace(request.TemporaryPassword))
+        if (!string.IsNullOrWhiteSpace(request.Password))
         {
             body["credentials"] = new[]
             {
-                new Dictionary<string, object> { ["type"] = "password", ["value"] = request.TemporaryPassword!, ["temporary"] = true }
+                new Dictionary<string, object>
+                {
+                    ["type"] = "password",
+                    ["value"] = request.Password!,
+                    ["temporary"] = request.PasswordIsTemporary
+                }
             };
         }
 
@@ -229,6 +246,32 @@ public sealed class KeycloakAdminClient : IKeycloakAdminClient
         if (!resp.IsSuccessStatusCode)
             throw new InvalidOperationException(
                 "Şifre sıfırlama e-postası gönderilemedi. Keycloak SMTP yapılandırması gerekli.");
+    }
+
+    public async Task<bool> ExistsAsync(string username, string? email, CancellationToken ct)
+    {
+        if (await AnyUserAsync($"{AdminBase}/users?username={Uri.EscapeDataString(username)}&exact=true", ct))
+            return true;
+
+        return !string.IsNullOrWhiteSpace(email)
+            && await AnyUserAsync($"{AdminBase}/users?email={Uri.EscapeDataString(email)}&exact=true", ct);
+    }
+
+    public async Task DeleteUserAsync(string userId, CancellationToken ct)
+    {
+        using var req = await AuthorizedAsync(HttpMethod.Delete, $"{AdminBase}/users/{userId}", ct);
+        using var resp = await _http.SendAsync(req, ct);
+        if (!resp.IsSuccessStatusCode && resp.StatusCode != HttpStatusCode.NotFound)
+            _logger.LogWarning("Kullanıcı silinemedi (telafi): {UserId} durum={Status}", userId, resp.StatusCode);
+    }
+
+    private async Task<bool> AnyUserAsync(string url, CancellationToken ct)
+    {
+        using var req = await AuthorizedAsync(HttpMethod.Get, url, ct);
+        using var resp = await _http.SendAsync(req, ct);
+        resp.EnsureSuccessStatusCode();
+        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct));
+        return doc.RootElement.GetArrayLength() > 0;
     }
 
     // --- Yardımcılar ---

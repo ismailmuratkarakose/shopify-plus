@@ -1,3 +1,4 @@
+using System.Threading.RateLimiting;
 using FluentValidation;
 using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.BuildingBlocks.Outbox;
@@ -50,6 +51,21 @@ builder.Services.AddOutboxDispatcher<MerchantDbContext>();
 // --- Kimlik doğrulama + yetkilendirme (izin matrisi ortak yapı taşında tanımlı) ---
 builder.Services.AddKeycloakJwtAuth(builder.Configuration, builder.Environment);
 
+// Anonim kayıt ucu için hız sınırı: kötüye kullanım / otomatik kayıt denemelerine karşı.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(SignupEndpoints.RateLimitPolicy, http =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: http.Connection.RemoteIpAddress?.ToString() ?? "bilinmeyen",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = builder.Configuration.GetValue<int?>("Signup:RateLimit:PermitLimit") ?? 5,
+                Window = TimeSpan.FromMinutes(builder.Configuration.GetValue<int?>("Signup:RateLimit:WindowMinutes") ?? 10),
+                QueueLimit = 0
+            }));
+});
+
 // Panel kullanıcılarının Keycloak üzerinde yönetimi (service account ile).
 builder.Services.AddHttpClient<IKeycloakAdminClient, KeycloakAdminClient>(c =>
     c.BaseAddress = new Uri(builder.Configuration["Keycloak:BaseUrl"] ?? "http://keycloak:8080"));
@@ -67,6 +83,7 @@ if (app.Environment.IsDevelopment())
     app.UseMarketplaceSwaggerUi("Merchant API");
 }
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseTenantResolution();
 app.UseAuthorization();
@@ -74,6 +91,7 @@ app.UseAuthorization();
 app.MapHealthChecks("/health");
 app.MapMerchantEndpoints();
 app.MapUserEndpoints();
+app.MapSignupEndpoints();
 app.MapMerchantInternalEndpoints();
 
 app.Run();

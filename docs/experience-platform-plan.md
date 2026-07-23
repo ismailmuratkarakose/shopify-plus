@@ -228,9 +228,21 @@ Pazaryeri-özel yapı **arşivlenmedi, tamamen silindi** (kullanıcı kararı):
 - **Kalan:** J-05 denetim kaydı (audit log), J-06 testler.
 
 **J-07…J-10 — Üyelik ve kimlik akışları (+15 adam-gün, plana yeni eklendi):**
-- **J-07 · Mağaza self-service kaydı ve sağlama (provisioning) — 5 gün.** Kayıt formu API'si →
-  Keycloak Admin API ile kullanıcı + `tenant_id` claim üretimi → Merchant (mağaza) kaydı →
-  ilk girişte Shopify bağlama akışına yönlendirme. Bugün bu adım elle yapılıyor.
+- **J-07 ✅ (2026-07-23) — Mağaza self-service kaydı ve sağlama:**
+  `POST /api/signup` **anonimdir** (henüz hesap yok) ve **hız sınırına tabidir** (IP bazlı sabit
+  pencere; prod 5/10dk, compose'da dev için gevşetildi). Akış: müsaitlik kontrolü → mağaza kaydı
+  (`Pending`) → Keycloak'ta `store-admin` kullanıcısı (`tenant_id` ile) → yanıtta "sonraki adım:
+  Shopify bağla". `GET /api/signup/availability` form doğrulaması için.
+  **Atomiklik:** iki ayrı sistem yazıldığından kullanıcı oluşturma başarısız olursa mağaza kaydı
+  **telafi edilir**; telafi de başarısız olursa sahipsiz kayıt açıkça loglanır.
+  **Komisyon oranını mağaza kendisi belirleyemez** — platform varsayılanı uygulanır
+  (`Platform:DefaultCommissionRate`). **Aktivasyon:** Shopify entegrasyonu yapılandırılınca
+  mağaza `Pending` → `Active`.
+  **YAKALANAN HATA:** parola her zaman "geçici" işaretleniyordu → Keycloak `UPDATE_PASSWORD` zorunlu
+  eylemi ekliyor ve yeni sahip giriş yapamıyordu ("Account is not fully set up"). Artık kayıtta parola
+  kalıcı (sahip kendi belirler), davet edilen kullanıcıda geçici (ilk girişte değiştirir).
+  Doğrulandı (smokeJ): kayıt → giriş (store-admin + tenant_id) → mağazasını görme → çakışma 409 →
+  geçersiz girdi 400 → Shopify bağla → **Active** → ekibe kullanıcı ekleme → veri izolasyonu.
 - **J-08 · Üretim kimlik akışı (Authorization Code + PKCE) — 4 gün.** Panel ve mobil için standart
   yetkilendirme kodu akışı, refresh token yönetimi, oturum sonlandırma; **password grant'in kaldırılması**
   (şu anki kullanım yalnızca geliştirme içindir).

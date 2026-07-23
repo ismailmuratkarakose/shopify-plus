@@ -157,6 +157,15 @@ public sealed class UpsertIntegrationHandler : IRequestHandler<UpsertIntegration
             Provider = request.Provider,
             IsActive = true
         });
+        // Shopify bağlandığı anda kayıt tamamlanmış sayılır: bekleyen mağaza etkinleşir.
+        if (string.Equals(request.Provider, IntegrationProvider.Shopify, StringComparison.OrdinalIgnoreCase))
+        {
+            var store = await _db.Merchants.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(m => m.Id == _tenant.TenantId, ct);
+            if (store is { Status: MerchantStatus.Pending })
+                store.Status = MerchantStatus.Active;
+        }
+
         await _db.SaveChangesAsync(ct);
 
         return Result.Success(new IntegrationDto(request.Provider, existing.IsActive, Mask(request.Config)));
