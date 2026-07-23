@@ -6,7 +6,7 @@
 > ilgili faz tamamen kaldırıldı.** **Mobil uygulama (React Native) ve web admin UI
 > kapsam dışı**; yalnızca backend/REST API'ler (mobilin ve web panelin *backing* servisleri) inşa edilir.
 
-## 0. 🔴 KAPSAM DÜZELTMESİ (2026-07-23): Shopify zorunlu değil
+## 0. 🔴 KAPSAM DÜZELTMESİ (2026-07-23): Shopify opsiyonel bir veri kaynağıdır
 
 Her merchant Shopify kullanmak zorunda **değildir**. Ürünlerini ve **kategorilerini** manuel olarak
 veya **Excel/CSV içeri aktarımla** yönetmek isteyebilir. Shopify, zorunlu bir bağımlılık değil,
@@ -25,14 +25,54 @@ senkronu bu kataloğu **besler**; Mobil API, CMS doğrulaması ve kişiselleşti
 Aktivasyon Shopify'dan koparılır. (Faz B'de silinen Catalog servisi geri gelir — ancak pazaryeri
 master/offer semantiğiyle değil, mağaza-başına katalog olarak.)
 
-**AÇIK KARAR — Shopify'sız mağaza nasıl satış yapacak?**
-- **(a)** Katalog + deneyim modu: sipariş platform dışında (telefon, WhatsApp, kendi sitesi). Ek efor ~0.
-- **(b)** Platformun kendi sepet/sipariş/ödeme altyapısı: silinen Order/Payment/Inventory doğru
-  semantikle geri gelir. Ek efor ~40–60 adam-gün.
-- **(c)** `ICommerceProvider` soyutlaması: checkout da eklenti (Shopify + native). (b) + ~8 gün.
+**KARAR (2026-07-23, kullanıcı): Ödeme ve checkout PLATFORMUNDUR — Shopify'ın değil.**
 
-Karar verilmeden katalog refactor'üne başlanmamalıdır; (b)/(c) seçilirse teklif eforu
-311 → ~370+ adam-güne çıkar.
+> "shopify ödeme için kullanmayacağım. ödeme için ben pazaryeri olarak bir firmayla iyzico ile
+> anlaşacağım. shopify sadece ürün stok kategori vs yönetimi için müşteriye kolaylık olsun diye istiyorum."
+
+Bu, kaynak dökümanın **çekirdek varsayımını tersine çevirir** ("Ödeme süreçleri Shopify Checkout
+üzerinden yürütülür" → GEÇERSİZ). Sonuçları:
+
+**Shopify'ın rolü daraldı:** yalnızca **ürün / stok / kategori içeri aktarım kaynağı**. Checkout,
+sipariş, ödeme, müşteri kimliği Shopify'da DEĞİL. `IShopifyClient`'ın sipariş/müşteri/indirim
+senkronu ikincil önemde; asıl değer ürün+stok+koleksiyon senkronunda.
+
+**Faz B'de silinen servisler geri geliyor.** Hepsi git geçmişinde (`6e28646^`) duruyor:
+Payment (+`IPaymentProvider`, `PaymentProviderResolver`), Order (+saga, telafi tüketicileri),
+Inventory (+rezervasyon), sepet (BFF/Redis → Mobil API'ye taşınır), komisyon (`Merchant.CommissionRate`),
+Reporting. **Ancak birebir geri alma YANLIŞ olur** — aşağıdaki fark yüzünden.
+
+**🔑 Kritik tasarım farkı — iyzico "Pazaryeri" modeli:** Eski Payment servisi iyzico'yu *merchant
+başına* çözüyordu (her mağazanın kendi iyzico hesabı; `IyzicoPaymentProvider`: "Merchant config'inden
+çözülür"). Yeni modelde **sözleşme platformundur**: tek üye işyeri hesabı, mağazalar ise
+**alt üye işyeri (submerchant)**. Bunun getirdikleri:
+- **Mağaza kaydı ağırlaşır:** submerchant açmak için tüzel kişilik verisi gerekir — vergi no/TCKN,
+  IBAN, adres, işyeri tipi (şahıs / limited / A.Ş.). Yani onboarding'e bir **KYC adımı** eklenir.
+  Mevcut self-service kayıt (J-07) bunu toplamıyor → genişletilmeli.
+- **Çoklu satıcı checkout basitleşir:** iyzico sepet kalemleri kalem başına `subMerchantKey` +
+  `subMerchantPrice` taşır → **tek ödeme** birden fazla mağazayı kapsayabilir. Eski kodun
+  "checkout'u merchant başına böl" yaklaşımı gereksiz; ödeme tek, **sipariş/kargo** mağaza başına bölünür.
+- **Komisyon = toplam tutar − Σ(submerchant tutarı)**; hakediş/ödeme aktarımı ve mutabakat raporu gerekir.
+- `IPaymentProvider` soyutlaması korunur (desen doğru), ama çözümleme merchant'tan **platforma** taşınır.
+
+**Müşteri kimliği (D-10) yeniden yazılır:** Pazaryeri müşterisi Shopify müşteri hesabıyla DEĞİL,
+**platformun kendi kimliğiyle** doğrulanır (üye ol / giriş / misafir sepeti). Bu, üç kullanıcı tipi
+modeliyle de tutarlı hale gelir.
+
+**Katalog:** platformun kendi katalog servisi; kaynak `manual` / `excel` / `shopify`. Stok artık
+salt-okunur bir Shopify yansıması değil — **rezervasyon** yapılabilir olmalı (Inventory geri geliyor).
+Shopify'dan gelen stok, senkron kaynağı olarak Inventory'yi besler.
+
+**Efor etkisi:** çekirdek 311 adam-gün → **~380–400 adam-gün**. Excel/Word teklif dosyaları bu
+düzeltmeyi YANSITMIYOR (kullanıcı o an güncelleme istememişti) — müşteriye gönderilmeden önce
+revize edilmeli.
+
+**AÇIK KALAN YAPISAL SORU — kiracılık (tenant) modeli:** Tek bir pazaryeri mi (kiracı = pazaryeri,
+mağazalar alt varlık; tek mobil uygulama; CMS içeriğini pazaryeri yönetir), yoksa platform birden
+çok pazaryerine SaaS olarak mı satılacak? Mevcut kodda `TenantId` = mağaza; tek-pazaryeri modelinde
+CMS içeriği **platform seviyesinde** olmalı, mağaza seviyesinde değil. Ayrıca Pivot 1'deki
+**barkod + ürün master/satıcı teklifi** modeli (aynı ürünü N mağaza farklı fiyattan satar) geri
+gelecek mi? Katalog refactor'ü bu iki cevaba bağlı.
 
 ## 1. Ürün şekli farkı (kritik)
 
