@@ -58,62 +58,27 @@ public static class StoreProductEndpoints
         });
 
         group.MapPost("/", async (UpsertStoreProductRequest req, CatalogDbContext db, IStoreContext scope,
-            IAuditLogger audit, CancellationToken ct) =>
+            Application.ProductUpsertService upsert, IAuditLogger audit, CancellationToken ct) =>
         {
             if (scope.StoreId is not { } storeId)
                 return Results.Problem("Mağaza kapsamı yok. (Platform personeli X-Acting-Store başlığı kullanmalı.)",
                     statusCode: StatusCodes.Status400BadRequest, title: "store.missing");
 
-            var barcode = req.Barcode?.Trim();
-            if (string.IsNullOrWhiteSpace(barcode) || barcode.Length is < 8 or > 64)
-                return Results.Problem("Geçerli bir barkod (GTIN/EAN/UPC, 8-64 karakter) gerekli.",
-                    statusCode: StatusCodes.Status400BadRequest, title: "product.barcode_invalid");
-            if (string.IsNullOrWhiteSpace(req.Title))
-                return Results.Problem("Ürün adı gerekli.", statusCode: StatusCodes.Status400BadRequest,
-                    title: "product.title_required");
-            if (req.Price <= 0)
-                return Results.Problem("Fiyat sıfırdan büyük olmalı.", statusCode: StatusCodes.Status400BadRequest,
-                    title: "product.price_invalid");
             if (req.CategoryId is { } cid && !await db.Categories.AnyAsync(c => c.Id == cid && c.IsActive, ct))
                 return Results.Problem("Kategori bulunamadı.", statusCode: StatusCodes.Status400BadRequest,
                     title: "product.category_not_found");
 
-            // Barkod → master: yoksa kart oluşur, varsa karta katılım (kartın alanları değişmez —
-            // kart zenginleştirme/moderasyon ayrı bir platform yetkisidir).
-            var product = await db.Products.FirstOrDefaultAsync(x => x.Barcode == barcode, ct);
-            var createdMaster = false;
-            if (product is null)
-            {
-                product = new Product
-                {
-                    Barcode = barcode,
-                    Title = req.Title.Trim(),
-                    Description = req.Description,
-                    Brand = req.Brand,
-                    CategoryId = req.CategoryId,
-                    ImageUrl = req.ImageUrl,
-                    CreatedSource = ProductSource.Manual
-                };
-                db.Products.Add(product);
-                createdMaster = true;
-            }
+            var input = new Application.UpsertInput(req.Barcode, req.Title, req.Price, req.Description,
+                req.Brand, req.CategoryId, req.ImageUrl, req.Sku, req.CompareAtPrice, req.StockQuantity);
+            var (outcome, error) = await upsert.UpsertAsync(input, ProductSource.Manual, ct);
+            if (error is not null)
+                return Results.Problem(error, statusCode: StatusCodes.Status400BadRequest, title: "product.invalid");
 
-            var offer = await db.Offers.FirstOrDefaultAsync(o => o.ProductId == product.Id, ct);
-            var createdOffer = offer is null;
-            if (offer is null)
-            {
-                offer = new Offer { ProductId = product.Id, Source = ProductSource.Manual };
-                db.Offers.Add(offer);
-            }
-
-            offer.Price = req.Price;
-            offer.CompareAtPrice = req.CompareAtPrice;
-            offer.StockQuantity = req.StockQuantity;
-            offer.Sku = req.Sku;
-            offer.IsActive = true;
+            var (product, offer, createdMaster, createdOffer) = (outcome!.Product, outcome.Offer,
+                outcome.CreatedMaster, outcome.CreatedOffer);
 
             audit.Record(createdOffer ? "offer.create" : "offer.update",
-                $"'{product.Title}' ({barcode}) — fiyat {req.Price} {offer.Currency}, stok {req.StockQuantity}" +
+                $"'{product.Title}' ({product.Barcode}) — fiyat {req.Price} {offer.Currency}, stok {req.StockQuantity}" +
                 (createdMaster ? " [yeni ürün kartı]" : " [mevcut karta katılım]"),
                 "Offer", offer.Id.ToString());
             await db.SaveChangesAsync(ct);

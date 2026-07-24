@@ -15,6 +15,7 @@ builder.Services.AddScoped<IStoreContext, StoreContext>();
 builder.Services.AddDbContext<CatalogDbContext>(opt =>
     opt.UseNpgsql(builder.Configuration.GetConnectionString("CatalogDb")));
 
+builder.Services.AddScoped<Marketplace.Catalog.Api.Application.ProductUpsertService>();
 builder.Services.AddAuditLogging<CatalogDbContext>();
 builder.Services.AddKeycloakJwtAuth(builder.Configuration, builder.Environment);
 
@@ -37,6 +38,7 @@ app.MapHealthChecks("/health");
 app.MapCategoryEndpoints();
 app.MapPublicCatalogEndpoints();
 app.MapStoreProductEndpoints();
+app.MapImportEndpoints();
 // Katalog denetim kaydı: mağaza kendi teklif hareketlerini, platform hepsini görür.
 app.MapAuditEndpoints<CatalogDbContext>("/api/audit/catalog");
 

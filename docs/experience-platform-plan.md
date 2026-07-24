@@ -107,7 +107,7 @@ Bağımlılık sırasıyla (⟳ = geri getirilecek, git `6e28646^`):
 |---|---|---|---|
 | R1 | Kapsamlama refactor'ü: `TenantId`=pazaryeri, `StoreId` boyutu; CMS ve içerik rollerini platform seviyesine taşı | ✅ dilim 1 (2026-07-23) | 10–14 |
 | R2 | **Katalog servisi**: ürün master (barkod) + kategori ağacı + satıcı teklifi | ✅ dilim 1 (2026-07-24) | 18–22 |
-| R3 | Manuel ürün/kategori CRUD + **Excel/CSV içeri aktarım** (doğrulama + hata raporu) | yeni | 12–15 |
+| R3 | Manuel ürün/kategori CRUD + **Excel/CSV içeri aktarım** (doğrulama + hata raporu) | ✅ (2026-07-24) | 12–15 |
 | R4 | Shopify senkronunu katalog **besleyicisine** çevir (barkod eşleme, `Source`) | uyarla | 8 |
 | R5 | Müşteri kimliği (üye ol/giriş/misafir sepeti) — D-10 yeniden yazımı | yeni | 12 |
 | R6 | Sepet (BFF/Redis'ten Mobil API'ye taşı, teklif bazlı) | ⟳ uyarla | 8 |
@@ -182,6 +182,29 @@ işaretlenir ✓; teklif çekilince satıcı sayısı düşer, kart kalır ✓.
 
 **Ertelenen:** varyant desteği (beden/renk) — master model bilinçli tek-SKU başladı; kart
 zenginleştirme/moderasyon uçları; mobil kataloğun bu servise bağlanması (R4 ile birlikte).
+
+
+#### R3 tamamlandı (2026-07-24)
+
+**Excel/CSV toplu içeri aktarım** — Shopify kullanmayan mağazanın ana yolu:
+- `POST /api/store/products/import` (store.manage; multipart, 2MB / 5000 satır sınırı) +
+  `GET /api/store/products/import/template` (örnek CSV, anonim).
+- **Parser toleransı:** CSV ayracı başlıktan koklanır (Türkçe Excel `;` ile dışa aktarır),
+  tırnaklı alanlar desteklenir; Türkçe kolon başlıkları (Barkod/Fiyat/Stok/Marka/Kategori...)
+  İngilizce karşılıklarına eşlenir; ondalık hem `1.349,90` hem `1349.90` okunur.
+  XLSX için ClosedXML (MIT — EPPlus bilinçli tercih EDİLMEDİ, ticari lisansa geçti).
+- **Kısmi başarı:** hatalı satır diğerlerini engellemez; rapor satır numarasıyla hata VE uyarı
+  listesi döner. Kategori bulunamazsa satır DÜŞMEZ — ürün kategorisiz aktarılır, uyarı verilir
+  (kategori slug ya da adla eşlenir). Geçerli satırlar tek transaction'da kaydedilir; denetim
+  kaydı (catalog.import, sayaçlarla) aynı işlemde yazılır.
+- **Ortak iş kuralı:** `ProductUpsertService` — manuel uç (R2) ve import aynı barkod→master
+  kuralını paylaşır; SaveChanges çağırmaz (toplu kayıt). `Local` önceliği sayesinde aynı dosyada
+  tekrar eden barkod ikinci satırda DB'ye gitmeden karta bağlanır (son satır kazanır).
+
+**Smoke:** TR başlıklı `;`'li CSV 5 satır → 3 aktarıldı / 2 satır hatası (boş fiyat, kısa barkod)
+/ 1 kategori uyarısı ✓; tekrarlı barkodda son fiyat kazandı (2299) ✓; XLSX 2 satır ✓;
+source=excel işaretlendi ✓; aynı dosya yeniden → 0 yeni kart (idempotent) ✓; şablon 200 /
+anonim yükleme 401 ✓; denetim kaydı sayaçlarla ✓.
 
 Sonrasında mevcut plandaki deneyim fazları (E banner/popup, F tema, G kişiselleştirme,
 H push, I çoklu dil, K analitik, L 3. parti, N K8s) devam eder.
