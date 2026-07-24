@@ -11,6 +11,7 @@
   </Folder>
   <Folder Name="/src/Services/" />
   <Folder Name="/src/Services/Cms/">
+    <Project Path="src/Services/Catalog/Marketplace.Catalog.Api/Marketplace.Catalog.Api.csproj" />
     <Project Path="src/Services/Cms/Marketplace.Cms.Api/Marketplace.Cms.Api.csproj" />
   </Folder>
   <Folder Name="/src/Services/Merchant/">

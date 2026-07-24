@@ -106,7 +106,7 @@ Bağımlılık sırasıyla (⟳ = geri getirilecek, git `6e28646^`):
 | # | İş | Durum | ~Efor |
 |---|---|---|---|
 | R1 | Kapsamlama refactor'ü: `TenantId`=pazaryeri, `StoreId` boyutu; CMS ve içerik rollerini platform seviyesine taşı | ✅ dilim 1 (2026-07-23) | 10–14 |
-| R2 | **Katalog servisi**: ürün master (barkod) + kategori ağacı + satıcı teklifi | ⟳ uyarla | 18–22 |
+| R2 | **Katalog servisi**: ürün master (barkod) + kategori ağacı + satıcı teklifi | ✅ dilim 1 (2026-07-24) | 18–22 |
 | R3 | Manuel ürün/kategori CRUD + **Excel/CSV içeri aktarım** (doğrulama + hata raporu) | yeni | 12–15 |
 | R4 | Shopify senkronunu katalog **besleyicisine** çevir (barkod eşleme, `Source`) | uyarla | 8 |
 | R5 | Müşteri kimliği (üye ol/giriş/misafir sepeti) — D-10 yeniden yazımı | yeni | 12 |
@@ -153,6 +153,35 @@ adlandırması kozmetik olarak ertelendi.
 anonim deneyim 200 + Home çözümü ✓, anonim sayfa yönetimi 401 ✓, içerik rolü sızıntısı 400 ✓,
 audit ayrımı (403/200) + yayın kaydı StoreId=null ✓, X-Acting-Store 200 ✓, Shopify bağla →
 mutabakat senkronu 5 ürün/2 koleksiyon/4 sipariş/3 müşteri/3 indirim/4 sayfa ✓.
+
+
+#### R2 dilim 1 tamamlandı (2026-07-24)
+
+**Yeni servis: `Marketplace.Catalog.Api`** (port 8091, şema `catalog`, eski 7a master+offer kodundan
+R1 sözleşmesine uyarlandı). İki katman:
+- **Pazaryeri katmanı** (mağaza filtresi yok): `Product` (barkod benzersiz; kartı ilk ekleyen
+  oluşturur, sonrakiler kartın alanlarını EZEMEZ — zenginleştirme/moderasyon platforma ait) +
+  `Category` ağacı (ParentId; taksonomiyi yalnız platform yönetir, silme kullanımdaysa pasifleştirir).
+- **Mağaza katmanı** (StoreId filtreli): `Offer` — fiyat/stok/SKU, StoreId+ProductId benzersiz,
+  `Source` = manual/excel/shopify. `StockQuantity` R7'de rezervasyonlu Inventory'ye devredilecek.
+
+**Uçlar:** kamusal (anonim) `/api/catalog/products` liste/arama/sıralama + `/{id}` satıcı kıyası
+(ucuz önde) + `/barcode/{barcode}`; `/api/catalog/categories` (okuma anonim, yazma owner);
+`/api/store/products` (store.manage) — barkodla upsert, listeleme, güncelleme, satıştan kaldırma
+(pasifleştirme); `/api/audit/catalog` denetim.
+
+**Kritik EF detayı:** Offer'daki mağaza query filter'ı navigation üzerinden kamusal sorgulara da
+uygulanır — anonim istekte tüm teklifler elenir ve vitrin boş kalırdı. Kamusal uçlar
+`IgnoreQueryFilters` ile bilinçli olarak mağazalar-arası okur.
+
+**Smoke (smokeR2, tümü ilk koşuda geçti):** kategori ağacı + taksonomi yetkisi ✓; mağaza-1 kart
+oluşturur, mağaza-2 AYNI barkodla karta katılır (kart adı ezilmez) ✓; anonim vitrin satıcı=2,
+en iyi fiyat doğru ✓; mağaza izolasyonu (başkasının teklifine 404) ✓; anonim 401 / içerik
+editörü 403 ✓; owner X-Acting-Store ile mağaza adına fiyat günceller ve denetimde "mağaza adına"
+işaretlenir ✓; teklif çekilince satıcı sayısı düşer, kart kalır ✓.
+
+**Ertelenen:** varyant desteği (beden/renk) — master model bilinçli tek-SKU başladı; kart
+zenginleştirme/moderasyon uçları; mobil kataloğun bu servise bağlanması (R4 ile birlikte).
 
 Sonrasında mevcut plandaki deneyim fazları (E banner/popup, F tema, G kişiselleştirme,
 H push, I çoklu dil, K analitik, L 3. parti, N K8s) devam eder.

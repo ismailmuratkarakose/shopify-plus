@@ -73,6 +73,20 @@ services:
         condition: service_healthy
 
   # Store Data: Shopify bağlama (OAuth) + read-model senkronu (ürün/koleksiyon...)
+  catalog:
+    build:
+      context: .
+      dockerfile: src/Services/Catalog/Marketplace.Catalog.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__CatalogDb: "Host=postgres;Port=5432;Database=catalog;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
+      Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
+    ports:
+      - "8091:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   cms:
     build:
       context: .
