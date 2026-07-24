@@ -25,7 +25,7 @@ public static class PublicCatalogEndpoints
 
         group.MapGet("/", async (CatalogDbContext db, CancellationToken ct,
             string? q = null, Guid? categoryId = null, string sort = "relevance",
-            int page = 1, int pageSize = 20) =>
+            string? ids = null, int page = 1, int pageSize = 20) =>
         {
             var p = Math.Max(1, page);
             var size = Math.Clamp(pageSize, 1, 100);
@@ -33,6 +33,14 @@ public static class PublicCatalogEndpoints
             // IgnoreQueryFilters ŞART: Offer'daki mağaza filtresi navigation üzerinden de uygulanır;
             // anonim istekte (StoreId=null) tüm teklifler elenir ve vitrin boş kalırdı.
             var products = db.Products.IgnoreQueryFilters().Where(x => x.IsActive);
+            if (!string.IsNullOrWhiteSpace(ids))
+            {
+                // Toplu kimlik sorgusu (favoriler/son gezilenler zenginleştirmesi için).
+                var idList = ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(x => Guid.TryParse(x, out var g) ? g : Guid.Empty)
+                    .Where(g => g != Guid.Empty).ToList();
+                products = products.Where(x => idList.Contains(x.Id));
+            }
             if (!string.IsNullOrWhiteSpace(q))
             {
                 var term = $"%{q.Trim()}%";

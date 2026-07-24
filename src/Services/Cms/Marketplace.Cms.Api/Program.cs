@@ -22,11 +22,15 @@ builder.Services.AddDbContext<CmsDbContext>(opt =>
 // Medya deposu: yerel dosya (geliştirme). S3/MinIO aynı arayüzün arkasına eklenebilir.
 builder.Services.AddSingleton<IMediaStorage, LocalFileMediaStorage>();
 
-// İçerik bütünlüğü doğrulaması için Shopify read-model'i (kullanıcının JWT'si taşınır).
+// İçerik bütünlüğü doğrulaması (R4): ürün/kategori referansları ortak Katalog'dan (anonim),
+// indirim kodları Shopify read-model'inden (kullanıcının JWT'si taşınır) doğrulanır.
 builder.Services.AddTransient<AuthForwardingHandler>();
-builder.Services.AddHttpClient<IStoreDataClient, StoreDataClient>(c =>
+builder.Services.AddHttpClient("catalog", c =>
+    c.BaseAddress = new Uri(builder.Configuration["Services:Catalog"] ?? "http://catalog:8080"));
+builder.Services.AddHttpClient("shopifysync", c =>
     c.BaseAddress = new Uri(builder.Configuration["Services:ShopifySync"] ?? "http://shopifysync:8080"))
     .AddHttpMessageHandler<AuthForwardingHandler>();
+builder.Services.AddScoped<IStoreDataClient, StoreDataClient>();
 builder.Services.AddScoped<ContentValidator>();
 builder.Services.AddScoped<SnapshotBuilder>();
 builder.Services.AddAuditLogging<CmsDbContext>();

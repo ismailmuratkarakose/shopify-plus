@@ -31,6 +31,9 @@ builder.Services.AddHttpClient<IStoreClient, StoreClient>(c =>
 builder.Services.AddSingleton<ExperienceCache>();
 builder.Services.AddScoped<ExperienceService>();
 
+builder.Services.AddHttpClient<ICatalogClient, CatalogClient>(c =>
+    c.BaseAddress = new Uri(builder.Configuration["Services:Catalog"] ?? "http://catalog:8080"));
+
 builder.Services.AddKeycloakJwtAuth(builder.Configuration, builder.Environment);
 
 builder.Services.AddHealthChecks().AddDbContextCheck<MobileDbContext>("mobile-db");

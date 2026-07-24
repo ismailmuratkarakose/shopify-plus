@@ -8,9 +8,10 @@ namespace Marketplace.Cms.Api.Validation;
 public record ValidationIssue(Guid ComponentId, string ComponentType, string Severity, string Message);
 
 /// <summary>
-/// İçerik bütünlüğü: bileşenlerin işaret ettiği Shopify kayıtları (ürün, koleksiyon, indirim)
-/// hâlâ var mı? Silinmiş bir koleksiyona bağlı bir alan, mobilde boş ekran demektir.
-/// Severity: "error" (kırık referans, yayını engeller) | "warning" (doğrulanamadı).
+/// İçerik bütünlüğü (R4): bileşenlerin işaret ettiği kayıtlar hâlâ var mı? Ürün ve kategori
+/// referansları ORTAK KATALOG'a, indirim kodları Shopify read-model'ine karşı doğrulanır.
+/// ("collection" bileşeni ortak katalogda KATEGORİ'ye karşılık gelir.) Silinmiş bir referans,
+/// mobilde boş ekran demektir. Severity: "error" (yayını engeller) | "warning" (doğrulanamadı).
 /// </summary>
 public sealed class ContentValidator(IStoreDataClient storeData)
 {
@@ -47,20 +48,20 @@ public sealed class ContentValidator(IStoreDataClient storeData)
             switch (c.Type)
             {
                 case ComponentTypes.Collection:
-                    CheckCollection(c, s, "collectionId", refs, issues);
+                    CheckCategory(c, s, "collectionId", refs, issues);
                     break;
 
                 case ComponentTypes.ProductGrid:
                     var source = s.TryGetProperty("source", out var src) ? src.GetString() : null;
                     if (source == "collection")
-                        CheckCollection(c, s, "collectionId", refs, issues);
+                        CheckCategory(c, s, "collectionId", refs, issues);
                     else if (source == "manual" && s.TryGetProperty("productIds", out var pids) && pids.ValueKind == JsonValueKind.Array)
                     {
                         foreach (var el in pids.EnumerateArray())
                         {
                             if (TryReadId(el, out var pid) && !refs.ProductIds.Contains(pid))
                                 issues.Add(new ValidationIssue(c.Id, c.Type, Error,
-                                    $"Ürün mağazada bulunamadı (silinmiş olabilir): {pid}"));
+                                    $"Ürün katalogda bulunamadı (silinmiş olabilir): {pid}"));
                         }
                     }
                     break;
@@ -69,7 +70,7 @@ public sealed class ContentValidator(IStoreDataClient storeData)
                     if (s.TryGetProperty("discountCode", out var code) && code.GetString() is { Length: > 0 } dc
                         && !refs.DiscountCodes.Contains(dc))
                         issues.Add(new ValidationIssue(c.Id, c.Type, Error,
-                            $"İndirim kodu mağazada bulunamadı: '{dc}'"));
+                            $"İndirim kodu bulunamadı: '{dc}'"));
                     break;
 
                 case ComponentTypes.Banner:
@@ -78,10 +79,10 @@ public sealed class ContentValidator(IStoreDataClient storeData)
                     {
                         if (TryReadId(target, out var tid))
                         {
-                            var exists = linkType == "product" ? refs.ProductIds.Contains(tid) : refs.CollectionIds.Contains(tid);
+                            var exists = linkType == "product" ? refs.ProductIds.Contains(tid) : refs.CategoryIds.Contains(tid);
                             if (!exists)
                                 issues.Add(new ValidationIssue(c.Id, c.Type, Error,
-                                    $"Banner hedefi mağazada bulunamadı ({linkType}): {tid}"));
+                                    $"Banner hedefi bulunamadı ({linkType}): {tid}"));
                         }
                     }
                     break;
@@ -91,24 +92,24 @@ public sealed class ContentValidator(IStoreDataClient storeData)
         return issues;
     }
 
-    private static void CheckCollection(PageComponent c, JsonElement s, string key, StoreRefs refs, List<ValidationIssue> issues)
+    private static void CheckCategory(PageComponent c, JsonElement s, string key, StoreRefs refs, List<ValidationIssue> issues)
     {
         if (!s.TryGetProperty(key, out var v)) return;
         if (!TryReadId(v, out var id)) return;
-        if (!refs.CollectionIds.Contains(id))
+        if (!refs.CategoryIds.Contains(id))
             issues.Add(new ValidationIssue(c.Id, c.Type, ContentValidator.Error,
-                $"Koleksiyon mağazada bulunamadı (silinmiş olabilir): {id}"));
+                $"Kategori katalogda bulunamadı (silinmiş olabilir): {id}"));
     }
 
-    /// <summary>Kimlik ayarlarda sayı veya metin olarak gelebilir; ikisini de kabul et.</summary>
-    private static bool TryReadId(JsonElement el, out long id)
+    /// <summary>Kimlik ayarlarda sayı veya metin (Guid) olarak gelebilir; metne indirger.</summary>
+    private static bool TryReadId(JsonElement el, out string id)
     {
-        id = 0;
-        return el.ValueKind switch
+        id = "";
+        switch (el.ValueKind)
         {
-            JsonValueKind.Number => el.TryGetInt64(out id),
-            JsonValueKind.String => long.TryParse(el.GetString(), out id),
-            _ => false
-        };
+            case JsonValueKind.Number: id = el.GetRawText(); return true;
+            case JsonValueKind.String: id = el.GetString() ?? ""; return id.Length > 0;
+            default: return false;
+        }
     }
 }

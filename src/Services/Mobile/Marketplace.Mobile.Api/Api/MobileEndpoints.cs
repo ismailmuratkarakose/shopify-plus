@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using System.Text.Json.Nodes;
-using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.Mobile.Api.Clients;
 using Marketplace.Mobile.Api.Domain;
 using Marketplace.Mobile.Api.Experience;
@@ -9,21 +8,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Marketplace.Mobile.Api.Api;
 
-public record MobileProductDto(long ProductId, string Title, string Handle, string? Vendor, string? ProductType,
-    string? ImageUrl, decimal Price, decimal? CompareAtPrice, bool InStock, int TotalStock);
-public record MobileVariantDto(long VariantId, string? Sku, string? Barcode, decimal Price,
-    decimal? CompareAtPrice, int InventoryQuantity, string? Title);
-public record MobileProductDetailDto(long ProductId, string Title, string Handle, string? Description,
-    string? Vendor, string? ProductType, string? ImageUrl, decimal Price, decimal? CompareAtPrice,
-    bool InStock, IReadOnlyList<MobileVariantDto> Variants);
 public record CheckoutItem(long VariantId, int Quantity);
 public record CheckoutRequest(List<CheckoutItem> Items);
-public record FavoriteRequest(long ProductId);
+public record FavoriteRequest(Guid ProductId);
 
 /// <summary>
 /// Mobil uygulamanın tükettiği tek giriş noktası: yayınlanan ekran yapılandırması (CMS snapshot'ı),
-/// katalog/arama (Shopify read-model'i), kullanıcı listeleri ve Shopify Checkout yönlendirmesi.
-/// Ödeme ve sipariş oluşturma Shopify tarafında yürür.
+/// ORTAK katalog (barkod master + satıcı teklifleri — R4) ve kullanıcı listeleri.
+/// Deneyim ve katalog KAMUSALDIR (giriş yapmamış pazaryeri müşterisi gezebilir);
+/// favoriler/son gezilenler kimlik ister. Checkout R8'de platform ödemesine dönecek.
 /// </summary>
 public static class MobileEndpoints
 {
@@ -42,7 +35,6 @@ public static class MobileEndpoints
     private static void MapExperience(RouteGroupBuilder api)
     {
         // Yayınlanan deneyim kamusaldır: giriş yapmamış pazaryeri müşterisi de uygulamayı açabilmeli.
-        // (Katalog uçları R2'de ortak kataloğa geçince onlar da anonim olacak.)
         var group = api.MapGroup("/experience").WithTags("Mobile.Experience").AllowAnonymous();
 
         group.MapGet("/{screen}", async (string screen, HttpContext http,
@@ -101,138 +93,100 @@ public static class MobileEndpoints
         });
     }
 
-    // --- Katalog / arama ---
+    // --- Katalog / arama (R4: ortak katalog, anonim) ---
     private static void MapCatalog(RouteGroupBuilder api)
     {
-        var group = api.MapGroup("/products").WithTags("Mobile.Catalog");
+        var group = api.MapGroup("/products").WithTags("Mobile.Catalog").AllowAnonymous();
 
-        group.MapGet("/", async (IStoreClient store, CancellationToken ct,
-            string? search = null, string? vendor = null, decimal? minPrice = null, decimal? maxPrice = null,
-            string? sort = null, int page = 1, int pageSize = 20) =>
+        // Liste/arama: ortak kataloğun kamusal ucuna vekillik eder (en iyi fiyat + satıcı sayısı).
+        group.MapGet("/", async (ICatalogClient catalog, CancellationToken ct,
+            string? search = null, Guid? categoryId = null, string? sort = null,
+            int page = 1, int pageSize = 20) =>
         {
-            var all = await store.GetProductsAsync(ct);
-            IEnumerable<StoreProduct> q = all.Where(p => p.Status == "active");
-
-            if (!string.IsNullOrWhiteSpace(search))
-                q = q.Where(p => p.Title.Contains(search, StringComparison.OrdinalIgnoreCase)
-                              || (p.Vendor?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
-                              || p.Variants.Any(v => (v.Sku ?? "").Contains(search, StringComparison.OrdinalIgnoreCase)
-                                                  || (v.Barcode ?? "").Contains(search, StringComparison.OrdinalIgnoreCase)));
-
-            if (!string.IsNullOrWhiteSpace(vendor))
-                q = q.Where(p => string.Equals(p.Vendor, vendor, StringComparison.OrdinalIgnoreCase));
-
-            if (minPrice is { } min) q = q.Where(p => MinPrice(p) >= min);
-            if (maxPrice is { } max) q = q.Where(p => MinPrice(p) <= max);
-
-            q = sort?.ToLowerInvariant() switch
-            {
-                "price_asc" => q.OrderBy(MinPrice),
-                "price_desc" => q.OrderByDescending(MinPrice),
-                "title" => q.OrderBy(p => p.Title),
-                _ => q.OrderBy(p => p.Title)
-            };
-
-            var total = q.Count();
-            var p2 = Math.Max(1, page);
-            var size = Math.Clamp(pageSize, 1, 100);
-            var items = q.Skip((p2 - 1) * size).Take(size).Select(ToListDto).ToList();
-
-            return Results.Ok(new { total, page = p2, pageSize = size, items });
+            var result = await catalog.SearchAsync(search, categoryId, sort, page, pageSize, ct);
+            return result is null
+                ? Results.Problem("Katalog şu anda erişilemez.", statusCode: StatusCodes.Status503ServiceUnavailable,
+                    title: "catalog.unavailable")
+                : Results.Ok(result);
         });
 
-        group.MapGet("/{productId:long}", async (long productId, ClaimsPrincipal user, IStoreContext scope,
-            IStoreClient store, MobileDbContext db, CancellationToken ct) =>
+        group.MapGet("/{productId:guid}", async (Guid productId, ClaimsPrincipal user,
+            ICatalogClient catalog, MobileDbContext db, CancellationToken ct) =>
         {
-            var p = await store.GetProductAsync(productId, ct);
-            if (p is null)
+            var product = await catalog.GetProductAsync(productId, ct);
+            if (product is null)
                 return Results.Problem($"Ürün bulunamadı: {productId}", statusCode: StatusCodes.Status404NotFound,
                     title: "product.not_found");
 
-            // Ürün detayı görüntülendi → "son gezilenler" listesine yaz (kişiselleştirmeyi besler).
-            if (scope.StoreId is { } storeId)
-                await RecordViewAsync(db, storeId, UserOf(user), productId, ct);
+            // Ürün detayı görüntülendi → giriş yapmış kullanıcıda "son gezilenler"e yaz
+            // (kişiselleştirmeyi besler). Anonim gezinmede sessizce atlanır.
+            if (user.Identity?.IsAuthenticated == true)
+                await RecordViewAsync(db, UserOf(user), productId, ct);
 
-            return Results.Ok(ToDetailDto(p));
+            return Results.Ok(product);
         });
 
-        var collections = api.MapGroup("/collections").WithTags("Mobile.Catalog");
-
-        collections.MapGet("/", async (IStoreClient store, CancellationToken ct) =>
-        {
-            var cols = await store.GetCollectionsAsync(ct);
-            return Results.Ok(cols.Select(c => new { c.CollectionId, c.Title, c.Handle, productCount = c.ProductIds.Count }));
-        });
-
-        collections.MapGet("/{collectionId:long}/products", async (long collectionId, IStoreClient store, CancellationToken ct) =>
-        {
-            var cols = await store.GetCollectionsAsync(ct);
-            var col = cols.FirstOrDefault(c => c.CollectionId == collectionId);
-            if (col is null)
-                return Results.Problem($"Koleksiyon bulunamadı: {collectionId}",
-                    statusCode: StatusCodes.Status404NotFound, title: "collection.not_found");
-
-            var all = await store.GetProductsAsync(ct);
-            var items = all.Where(p => col.ProductIds.Contains(p.ProductId)).Select(ToListDto).ToList();
-            return Results.Ok(new { col.CollectionId, col.Title, col.Handle, items });
-        });
+        // Kategori ağacı (eski "collections" kavramının ortak katalogdaki karşılığı).
+        api.MapGroup("/categories").WithTags("Mobile.Catalog").AllowAnonymous()
+            .MapGet("/", async (ICatalogClient catalog, CancellationToken ct) =>
+            {
+                var cats = await catalog.GetCategoriesAsync(ct);
+                return cats is null
+                    ? Results.Problem("Katalog şu anda erişilemez.",
+                        statusCode: StatusCodes.Status503ServiceUnavailable, title: "catalog.unavailable")
+                    : Results.Ok(cats);
+            });
     }
 
-    // --- Favoriler / son gezilenler ---
+    // --- Favoriler / son gezilenler (kimlik ister) ---
     private static void MapUserLists(RouteGroupBuilder api)
     {
         var fav = api.MapGroup("/favorites").WithTags("Mobile.User");
 
-        fav.MapGet("/", async (ClaimsPrincipal user, IStoreClient store, MobileDbContext db, CancellationToken ct) =>
+        fav.MapGet("/", async (ClaimsPrincipal user, ICatalogClient catalog, MobileDbContext db, CancellationToken ct) =>
         {
             var userRef = UserOf(user);
             var ids = await db.Favorites.Where(f => f.UserRef == userRef)
-                .OrderByDescending(f => f.CreatedAt).Select(f => f.ShopifyProductId).ToListAsync(ct);
-            var all = await store.GetProductsAsync(ct);
-            var items = ids.Select(id => all.FirstOrDefault(p => p.ProductId == id))
-                .Where(p => p is not null).Select(p => ToListDto(p!)).ToList();
-            return Results.Ok(items);
+                .OrderByDescending(f => f.CreatedAt).Select(f => f.ProductId).ToListAsync(ct);
+            var enriched = await catalog.GetByIdsAsync(ids, ct);
+            return Results.Ok(enriched?["items"] ?? new JsonArray());
         });
 
-        fav.MapPost("/", async (FavoriteRequest req, ClaimsPrincipal user, IStoreContext scope,
-            MobileDbContext db, CancellationToken ct) =>
+        fav.MapPost("/", async (FavoriteRequest req, ClaimsPrincipal user, MobileDbContext db, CancellationToken ct) =>
         {
-            if (scope.StoreId is not { } storeId) return Unauthorized();
             var userRef = UserOf(user);
-            var exists = await db.Favorites.AnyAsync(f => f.UserRef == userRef && f.ShopifyProductId == req.ProductId, ct);
+            var exists = await db.Favorites.AnyAsync(f => f.UserRef == userRef && f.ProductId == req.ProductId, ct);
             if (!exists)
             {
-                db.Favorites.Add(new FavoriteProduct { StoreId = storeId, UserRef = userRef, ShopifyProductId = req.ProductId });
+                db.Favorites.Add(new FavoriteProduct { UserRef = userRef, ProductId = req.ProductId });
                 await db.SaveChangesAsync(ct);
             }
             return Results.Ok(new { added = true, req.ProductId });
         });
 
-        fav.MapDelete("/{productId:long}", async (long productId, ClaimsPrincipal user, MobileDbContext db, CancellationToken ct) =>
+        fav.MapDelete("/{productId:guid}", async (Guid productId, ClaimsPrincipal user, MobileDbContext db, CancellationToken ct) =>
         {
             var userRef = UserOf(user);
-            var row = await db.Favorites.FirstOrDefaultAsync(f => f.UserRef == userRef && f.ShopifyProductId == productId, ct);
+            var row = await db.Favorites.FirstOrDefaultAsync(f => f.UserRef == userRef && f.ProductId == productId, ct);
             if (row is null) return Results.NotFound();
             db.Favorites.Remove(row);
             await db.SaveChangesAsync(ct);
             return Results.NoContent();
         });
 
-        api.MapGet("/recently-viewed", async (ClaimsPrincipal user, IStoreClient store, MobileDbContext db,
+        api.MapGet("/recently-viewed", async (ClaimsPrincipal user, ICatalogClient catalog, MobileDbContext db,
             CancellationToken ct, int limit = 10) =>
         {
             var userRef = UserOf(user);
             var ids = await db.RecentlyViewed.Where(r => r.UserRef == userRef)
                 .OrderByDescending(r => r.ViewedAt).Take(Math.Clamp(limit, 1, 50))
-                .Select(r => r.ShopifyProductId).ToListAsync(ct);
-            var all = await store.GetProductsAsync(ct);
-            var items = ids.Select(id => all.FirstOrDefault(p => p.ProductId == id))
-                .Where(p => p is not null).Select(p => ToListDto(p!)).ToList();
-            return Results.Ok(items);
+                .Select(r => r.ProductId).ToListAsync(ct);
+            var enriched = await catalog.GetByIdsAsync(ids, ct);
+            return Results.Ok(enriched?["items"] ?? new JsonArray());
         }).WithTags("Mobile.User");
     }
 
-    // --- Shopify Checkout yönlendirmesi ---
+    // --- Checkout (ARA DURUM: Shopify sepet bağlantısı — R8'de platform ödemesi/iyzico'ya dönecek) ---
     private static void MapCheckout(RouteGroupBuilder api)
     {
         api.MapPost("/checkout", async (CheckoutRequest req, IStoreClient store, CancellationToken ct) =>
@@ -247,7 +201,6 @@ public static class MobileEndpoints
                 return Results.Problem("Mağaza Shopify bağlantısı bulunamadı.",
                     statusCode: StatusCodes.Status409Conflict, title: "checkout.no_integration");
 
-            // Shopify sepet bağlantısı: ödeme ve sipariş oluşturma Shopify Checkout'ta tamamlanır.
             var cart = string.Join(",", req.Items.Select(i => $"{i.VariantId}:{i.Quantity}"));
             var url = $"https://{integration.ShopDomain}/cart/{cart}";
 
@@ -255,7 +208,7 @@ public static class MobileEndpoints
             {
                 checkoutUrl = url,
                 itemCount = req.Items.Sum(i => i.Quantity),
-                note = "Ödeme Shopify Checkout üzerinden tamamlanır."
+                note = "GEÇİCİ: R8'de platformun kendi ödeme akışına (iyzico) dönecek."
             });
         }).WithTags("Mobile.Checkout");
     }
@@ -264,30 +217,13 @@ public static class MobileEndpoints
     private static string UserOf(ClaimsPrincipal user) =>
         user.FindFirstValue("sub") ?? user.FindFirstValue(ClaimTypes.NameIdentifier) ?? "anonim";
 
-    private static IResult Unauthorized() =>
-        Results.Problem("Mağaza kapsamı yok.", statusCode: StatusCodes.Status401Unauthorized, title: "store.missing");
-
-    private static decimal MinPrice(StoreProduct p) => p.Variants.Count == 0 ? 0 : p.Variants.Min(v => v.Price);
-
-    private static async Task RecordViewAsync(MobileDbContext db, Guid storeId, string userRef, long productId, CancellationToken ct)
+    private static async Task RecordViewAsync(MobileDbContext db, string userRef, Guid productId, CancellationToken ct)
     {
-        var row = await db.RecentlyViewed.FirstOrDefaultAsync(r => r.UserRef == userRef && r.ShopifyProductId == productId, ct);
+        var row = await db.RecentlyViewed.FirstOrDefaultAsync(r => r.UserRef == userRef && r.ProductId == productId, ct);
         if (row is null)
-            db.RecentlyViewed.Add(new RecentlyViewedProduct { StoreId = storeId, UserRef = userRef, ShopifyProductId = productId });
+            db.RecentlyViewed.Add(new RecentlyViewedProduct { UserRef = userRef, ProductId = productId });
         else
             row.ViewedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
     }
-
-    private static MobileProductDto ToListDto(StoreProduct p) => new(
-        p.ProductId, p.Title, p.Handle, p.Vendor, p.ProductType, p.ImageUrl,
-        MinPrice(p), p.Variants.FirstOrDefault()?.CompareAtPrice,
-        p.Variants.Any(v => v.InventoryQuantity > 0), p.Variants.Sum(v => v.InventoryQuantity));
-
-    private static MobileProductDetailDto ToDetailDto(StoreProduct p) => new(
-        p.ProductId, p.Title, p.Handle, p.Description, p.Vendor, p.ProductType, p.ImageUrl,
-        MinPrice(p), p.Variants.FirstOrDefault()?.CompareAtPrice,
-        p.Variants.Any(v => v.InventoryQuantity > 0),
-        p.Variants.Select(v => new MobileVariantDto(v.VariantId, v.Sku, v.Barcode, v.Price,
-            v.CompareAtPrice, v.InventoryQuantity, v.Title)).ToList());
 }

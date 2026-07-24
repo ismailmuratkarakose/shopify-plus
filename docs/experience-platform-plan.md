@@ -108,7 +108,7 @@ Bağımlılık sırasıyla (⟳ = geri getirilecek, git `6e28646^`):
 | R1 | Kapsamlama refactor'ü: `TenantId`=pazaryeri, `StoreId` boyutu; CMS ve içerik rollerini platform seviyesine taşı | ✅ dilim 1 (2026-07-23) | 10–14 |
 | R2 | **Katalog servisi**: ürün master (barkod) + kategori ağacı + satıcı teklifi | ✅ dilim 1 (2026-07-24) | 18–22 |
 | R3 | Manuel ürün/kategori CRUD + **Excel/CSV içeri aktarım** (doğrulama + hata raporu) | ✅ (2026-07-24) | 12–15 |
-| R4 | Shopify senkronunu katalog **besleyicisine** çevir (barkod eşleme, `Source`) | 🟡 dilim 1 ✅ (2026-07-24) | 8 |
+| R4 | Shopify senkronunu katalog **besleyicisine** çevir (barkod eşleme, `Source`) | ✅ (2026-07-24) | 8 |
 | R5 | Müşteri kimliği (üye ol/giriş/misafir sepeti) — D-10 yeniden yazımı | yeni | 12 |
 | R6 | Sepet (BFF/Redis'ten Mobil API'ye taşı, teklif bazlı) | ⟳ uyarla | 8 |
 | R7 | Stok + rezervasyon (teklif seviyesinde; Shopify stok besler) | ⟳ uyarla | 10 |
@@ -223,10 +223,21 @@ DOKUNULMAZ — Shopify yalnızca ek bir kaynaktır.
 **Doğrulanan:** mağaza kataloğunda üç kaynak yan yana (shopify:5, excel:4, manuel:1 → 10 teklif,
 vitrinde 10 kart); bir sonraki mutabakat yeniKart=0 (idempotent).
 
-**Dilim 2 (bekliyor):** Mobil API kataloğu ortak Katalog'dan okusun (ürün kimliği long ShopifyId →
-Guid master; favoriler/son görüntülenenler göçü) ve CMS içerik doğrulaması ürün/kategori
-referanslarını Katalog'a karşı yapsın. O zamana dek mobil katalog uçları eski ShopifySync
-read-model'ini okumaya devam ediyor (bilinçli ara durum).
+**Dilim 2 tamamlandı (2026-07-24):**
+- **Mobil katalog ortak katalogdan:** `/api/mobile/products` + `/{id}` + `/api/mobile/categories`
+  artık Katalog'un kamusal uçlarına vekillik eder ve ANONİMDİR (giriş yapmamış müşteri gezebilir).
+  Ürün kimliği Guid master; detayda satıcı kıyası mobil sözleşmede de var. Eski `vendor` /
+  `minPrice`/`maxPrice` filtreleri düştü (kategori + arama + sıralama kaldı).
+- **Favoriler/son gezilenler pazaryeri genelinde:** mağaza boyutu kalktı, Guid `ProductId`'ye
+  geçti (migration `R4MobileCatalog`); zenginleştirme Katalog'un yeni `ids=` toplu sorgusuyla.
+  Kimlikli detay görüntüleme son-gezilenleri besler; anonim gezinme sessizce atlanır.
+- **CMS doğrulaması kataloğa karşı:** ürün referansları ortak katalog kartlarına (Guid),
+  "collection" bileşeni ortak katalogda KATEGORİ'ye eşlenir; indirim kodları Shopify
+  read-model'inde kalır (adlı iki HttpClient: catalog anonim, shopifysync JWT taşır).
+  Kimlik okuma metin-tabanlı (long da Guid da kabul).
+- Doğrulama: anonim mobil liste 10 kart (üç kaynak) ✓, Guid detay + teklifler ✓, favori
+  zenginleştirme ✓, kırık Guid referanslı yayın 409 / geçerliyle 200 ✓.
+- Checkout hâlâ Shopify permalink (bilinçli ara durum — R8'de iyzico'ya döner).
 
 Sonrasında mevcut plandaki deneyim fazları (E banner/popup, F tema, G kişiselleştirme,
 H push, I çoklu dil, K analitik, L 3. parti, N K8s) devam eder.

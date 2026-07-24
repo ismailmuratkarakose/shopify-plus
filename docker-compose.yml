@@ -92,6 +92,7 @@ services:
       context: .
       dockerfile: src/Services/Cms/Marketplace.Cms.Api/Dockerfile
     environment:
+      Services__Catalog: "http://catalog:8080"
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__CmsDb: "Host=postgres;Port=5432;Database=cms;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
       Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
@@ -110,6 +111,7 @@ services:
       context: .
       dockerfile: src/Services/Mobile/Marketplace.Mobile.Api/Dockerfile
     environment:
+      Services__Catalog: "http://catalog:8080"
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__MobileDb: "Host=postgres;Port=5432;Database=mobile;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
       Keycloak__Authority: "http://keycloak:8080/realms/marketplace"
