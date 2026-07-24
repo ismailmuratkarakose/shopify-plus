@@ -108,7 +108,7 @@ Bağımlılık sırasıyla (⟳ = geri getirilecek, git `6e28646^`):
 | R1 | Kapsamlama refactor'ü: `TenantId`=pazaryeri, `StoreId` boyutu; CMS ve içerik rollerini platform seviyesine taşı | ✅ dilim 1 (2026-07-23) | 10–14 |
 | R2 | **Katalog servisi**: ürün master (barkod) + kategori ağacı + satıcı teklifi | ✅ dilim 1 (2026-07-24) | 18–22 |
 | R3 | Manuel ürün/kategori CRUD + **Excel/CSV içeri aktarım** (doğrulama + hata raporu) | ✅ (2026-07-24) | 12–15 |
-| R4 | Shopify senkronunu katalog **besleyicisine** çevir (barkod eşleme, `Source`) | uyarla | 8 |
+| R4 | Shopify senkronunu katalog **besleyicisine** çevir (barkod eşleme, `Source`) | 🟡 dilim 1 ✅ (2026-07-24) | 8 |
 | R5 | Müşteri kimliği (üye ol/giriş/misafir sepeti) — D-10 yeniden yazımı | yeni | 12 |
 | R6 | Sepet (BFF/Redis'ten Mobil API'ye taşı, teklif bazlı) | ⟳ uyarla | 8 |
 | R7 | Stok + rezervasyon (teklif seviyesinde; Shopify stok besler) | ⟳ uyarla | 10 |
@@ -205,6 +205,28 @@ zenginleştirme/moderasyon uçları; mobil kataloğun bu servise bağlanması (R
 / 1 kategori uyarısı ✓; tekrarlı barkodda son fiyat kazandı (2299) ✓; XLSX 2 satır ✓;
 source=excel işaretlendi ✓; aynı dosya yeniden → 0 yeni kart (idempotent) ✓; şablon 200 /
 anonim yükleme 401 ✓; denetim kaydı sayaçlarla ✓.
+
+
+#### R4 dilim 1 tamamlandı (2026-07-24) — Shopify artık bir KAYNAK
+
+**Besleyici hattı:** `StoreSyncService` her senkron sonrası mağazanın Shopify ürünlerini Katalog'a
+iter (`ICatalogFeedClient` → Catalog `POST /internal/feed/shopify`; internal desen, gateway'e
+rotalanmaz). Barkodlu her varyant ayrı karta bağlanır (kart adı "Ürün - Varyant"); barkodsuz
+varyant master'a bağlanamayacağından atlanır ve loglanır. Teklif `source=shopify` +
+ShopifyProductId/VariantId + LastSyncedAt taşır. Besleme hatası senkronu DÜŞÜRMEZ (log; bir
+sonraki mutabakat yakalar).
+
+**Tam durum mutabakatı:** besleme tam liste olduğundan, o senkronda görülmeyen shopify-kaynaklı
+teklifler satıştan kalkar (Shopify'da silinen ürün vitrinde kalmaz). Manuel/Excel tekliflere
+DOKUNULMAZ — Shopify yalnızca ek bir kaynaktır.
+
+**Doğrulanan:** mağaza kataloğunda üç kaynak yan yana (shopify:5, excel:4, manuel:1 → 10 teklif,
+vitrinde 10 kart); bir sonraki mutabakat yeniKart=0 (idempotent).
+
+**Dilim 2 (bekliyor):** Mobil API kataloğu ortak Katalog'dan okusun (ürün kimliği long ShopifyId →
+Guid master; favoriler/son görüntülenenler göçü) ve CMS içerik doğrulaması ürün/kategori
+referanslarını Katalog'a karşı yapsın. O zamana dek mobil katalog uçları eski ShopifySync
+read-model'ini okumaya devam ediyor (bilinçli ara durum).
 
 Sonrasında mevcut plandaki deneyim fazları (E banner/popup, F tema, G kişiselleştirme,
 H push, I çoklu dil, K analitik, L 3. parti, N K8s) devam eder.

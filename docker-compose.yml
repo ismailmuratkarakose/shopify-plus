@@ -127,6 +127,7 @@ services:
       context: .
       dockerfile: src/Services/ShopifySync/Marketplace.ShopifySync.Api/Dockerfile
     environment:
+      Services__Catalog: "http://catalog:8080"
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__ShopifyDb: "Host=postgres;Port=5432;Database=shopifysync;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}"
       RabbitMq__Host: rabbitmq

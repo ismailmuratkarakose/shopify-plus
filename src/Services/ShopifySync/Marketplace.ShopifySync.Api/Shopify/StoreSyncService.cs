@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Marketplace.BuildingBlocks.MultiTenancy;
 using Marketplace.BuildingBlocks.Security;
+using Marketplace.ShopifySync.Api.Catalog;
 using Marketplace.ShopifySync.Api.Domain;
 using Marketplace.ShopifySync.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -20,16 +21,18 @@ public sealed class StoreSyncService
     private readonly IShopifyClient _shopify;
     private readonly ISecretProtector _protector;
     private readonly IStoreContext _scope;
+    private readonly ICatalogFeedClient _catalogFeed;
     private readonly ILogger<StoreSyncService> _logger;
 
     public StoreSyncService(
         ShopifySyncDbContext db, IShopifyClient shopify, ISecretProtector protector,
-        IStoreContext scope, ILogger<StoreSyncService> logger)
+        IStoreContext scope, ICatalogFeedClient catalogFeed, ILogger<StoreSyncService> logger)
     {
         _db = db;
         _shopify = shopify;
         _protector = protector;
         _scope = scope;
+        _catalogFeed = catalogFeed;
         _logger = logger;
     }
 
@@ -189,6 +192,11 @@ public sealed class StoreSyncService
             state.PageCount = pages.Count;
 
             await _db.SaveChangesAsync(ct);
+
+            // R4: Shopify son nokta değil, ortak kataloğun kaynağıdır — senkron sonrası mağazanın
+            // ürünleri kataloğa itilir (barkod → master + teklif). Besleme hatası senkronu düşürmez.
+            var syncedForFeed = await _db.SyncedProducts.Include(x => x.Variants).ToListAsync(ct);
+            await _catalogFeed.FeedAsync(merchantId, syncedForFeed, ct);
 
             _logger.LogInformation(
                 "Mağaza senkronu ({Trigger}): store={Store} ürün={P} koleksiyon={C} sipariş={O} müşteri={Cu} indirim={D} sayfa={Pg} süre={Ms}ms",

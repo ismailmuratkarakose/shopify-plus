@@ -74,6 +74,10 @@ builder.Services.AddMassTransit(x =>
 });
 builder.Services.AddOutboxDispatcher<ShopifySyncDbContext>();
 
+builder.Services.AddHttpClient<Marketplace.ShopifySync.Api.Catalog.ICatalogFeedClient,
+    Marketplace.ShopifySync.Api.Catalog.CatalogFeedClient>(c =>
+    c.BaseAddress = new Uri(builder.Configuration["Services:Catalog"] ?? "http://catalog:8080"));
+
 builder.Services.AddKeycloakJwtAuth(builder.Configuration, builder.Environment);
 
 builder.Services.AddHealthChecks().AddDbContextCheck<ShopifySyncDbContext>("shopify-db");

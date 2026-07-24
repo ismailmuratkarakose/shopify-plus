@@ -39,6 +39,7 @@ app.MapCategoryEndpoints();
 app.MapPublicCatalogEndpoints();
 app.MapStoreProductEndpoints();
 app.MapImportEndpoints();
+app.MapInternalFeedEndpoints();
 // Katalog denetim kaydı: mağaza kendi teklif hareketlerini, platform hepsini görür.
 app.MapAuditEndpoints<CatalogDbContext>("/api/audit/catalog");
 
